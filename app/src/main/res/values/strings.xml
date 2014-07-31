@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Школа-сервер</string>
+
+    <!-- Startscreen -->
+    <string name="server_teacher">СЕРВЕР \"УЧИТЕЛЬ\"</string>
+    <string name="client_student">КЛИЕНТ \"УЧЕНИК\"</string>
+    <string name="server_warning">Приложение будет работать в режиме СЕРВЕР \"УЧИТЕЛЬ\". Выбранный режим невозможно будет в дальнейшем изменить. Вы уверены?</string>
+    <string name="client_warning">Приложение будет работать в режиме КЛИЕНТ \"УЧЕНИК\". Выбранный режим невозможно будет в дальнейшем изменить. Вы уверены?</string>
+
+
+    <string name="ok">ОК</string>
+    <string name="cancel">Отмена</string>
+
+</resources>

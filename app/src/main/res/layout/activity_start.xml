@@ -1,0 +1,25 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".main"
+    android:gravity="center">
+
+    <Button
+        android:id="@+id/server"
+        android:layout_width="400dp"
+        android:layout_height="wrap_content"
+        android:text="@string/server_teacher"
+        android:textSize="40dp"
+        android:onClick="startServer"/>
+
+    <Button
+        android:id="@+id/client"
+        android:layout_width="400dp"
+        android:layout_height="wrap_content"
+        android:text="@string/client_student"
+        android:textSize="40dp"
+        android:layout_marginTop="30dp"
+        android:onClick="startClient"/>
+</LinearLayout>
