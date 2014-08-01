@@ -1,0 +1,23 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".main" >
+
+    <item
+        android:id="@+id/refresh"
+        android:showAsAction="always"
+        android:title="@string/refresh"
+        android:icon="@drawable/ic_launcher"/>
+
+    <item
+        android:id="@+id/update"
+        android:showAsAction="never"
+        android:title="@string/update_app"/>
+    <item
+        android:id="@+id/change_username"
+        android:showAsAction="never"
+        android:title="@string/change_user_name" />
+    <item
+        android:id="@+id/about"
+        android:showAsAction="never"
+        android:title="@string/about"/>
+</menu>

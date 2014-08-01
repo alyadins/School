@@ -8,15 +8,18 @@
         android:id="@+id/last_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/last_name"/>
+        android:hint="@string/last_name"
+        android:text="Пупкин"/>
     <EditText
         android:id="@+id/name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/name"/>
+        android:hint="@string/name"
+        android:text="Василий"/>
     <EditText
         android:id="@+id/group"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/group"/>
+        android:hint="@string/group"
+        android:text="25Б"/>
 </LinearLayout>

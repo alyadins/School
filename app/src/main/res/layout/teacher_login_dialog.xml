@@ -8,20 +8,24 @@
         android:id="@+id/last_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/last_name"/>
+        android:hint="@string/last_name"
+        android:text="Марьиванова"/>
     <EditText
         android:id="@+id/name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/name"/>
+        android:hint="@string/name"
+        android:text="Мария"/>
     <EditText
         android:id="@+id/second_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/second_name"/>
+        android:hint="@string/second_name"
+        android:text="Ивановна"/>
     <EditText
         android:id="@+id/subject"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/subject"/>
+        android:hint="@string/subject"
+        android:text="Рисование"/>
 </LinearLayout>

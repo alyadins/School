@@ -25,6 +25,19 @@
     <string name="error_enter_subject">Введите предмет</string>
     <string name="error_enter_group">Введите класс</string>
 
+    <!-- menu -->
+    <string name="refresh">Обновить</string>
+    <string name="update_app">Обновить приложение</string>
+    <string name="change_user_name">Изменить имя пользователя</string>
+    <string name="about">О программе</string>
+
+    <!-- student screen -->
+    <string name="available_apps">Доступные приложения</string>
+    <string-array name="status">
+        <item>Разблокирован</item>
+        <item>Заблокирован</item>
+    </string-array>
+
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>
 
