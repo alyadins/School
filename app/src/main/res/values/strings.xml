@@ -37,6 +37,8 @@
         <item>Разблокирован</item>
         <item>Заблокирован</item>
     </string-array>
+    <string name="favourites">Избранное</string>
+    <string name="server_list">Список серверов</string>
 
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>

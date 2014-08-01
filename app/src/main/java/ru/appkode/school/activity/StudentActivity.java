@@ -17,6 +17,8 @@ import android.view.View;
 
 import ru.appkode.school.R;
 import ru.appkode.school.data.StudentInfo;
+import ru.appkode.school.fragment.ServerListFragment;
+import ru.appkode.school.fragment.TabsFragment;
 import ru.appkode.school.fragment.UserInfoFragment;
 import ru.appkode.school.util.StringUtil;
 
@@ -31,6 +33,8 @@ public class StudentActivity extends Activity {
     private StudentInfo mStudentInfo;
 
     private UserInfoFragment mUserInfoFragment;
+    private TabsFragment mTabsFragment;
+
     private FragmentManager mFragmentManager;
 
     @Override
@@ -46,6 +50,23 @@ public class StudentActivity extends Activity {
             FragmentTransaction transaction = mFragmentManager.beginTransaction();
             transaction.add(R.id.user_info, mUserInfoFragment, null);
             transaction.commit();
+        }
+
+        if (mTabsFragment == null) {
+            mTabsFragment = new TabsFragment();
+            mFragmentManager = getFragmentManager();
+
+            FragmentTransaction transaction = mFragmentManager.beginTransaction();
+            transaction.add(R.id.server_info, mTabsFragment);
+            transaction.commit();
+
+
+            mTabsFragment.setLeftTitle(getString(R.string.favourites));
+            mTabsFragment.setRightTitle(getString(R.string.server_list));
+            ServerListFragment slf1 = new ServerListFragment();
+            mTabsFragment.setLeftFragment(slf1);
+            ServerListFragment slf2 = new ServerListFragment();
+            mTabsFragment.setRightFragment(slf2);
         }
     }
 
