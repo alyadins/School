@@ -29,12 +29,8 @@ public class StartActivity extends Activity {
                         finish();
                     }
                 })
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                }).show();
+                .setNegativeButton(R.string.cancel,null)
+                .show();
     }
 
     public void startClient(View v) {
@@ -48,11 +44,7 @@ public class StartActivity extends Activity {
                         finish();
                     }
                 })
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.dismiss();
-                    }
-                }).show();
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 }

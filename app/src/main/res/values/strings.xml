@@ -16,7 +16,15 @@
     <string name="subject">Предмет</string>
     <string name="group">Класс</string>
     <string name="enter_user_name">Введите имя пользователя</string>
-    
+
+
+    <!-- enter data error -->
+    <string name="error_enter_last_name">Введите фамилию</string>
+    <string name="error_enter_name">Введите имя</string>
+    <string name="error_enter_second_name">Введите Отчество</string>
+    <string name="error_enter_subject">Введите предмет</string>
+    <string name="error_enter_group">Введите класс</string>
+
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>
 
