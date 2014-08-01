@@ -1,13 +1,13 @@
-package ru.appkode.school;
+package ru.appkode.school.activity;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
+
+import ru.appkode.school.R;
 
 
 public class StartActivity extends Activity {
@@ -24,7 +24,9 @@ public class StartActivity extends Activity {
                 .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        //TODO start server mode
+                        Intent intent = new Intent(StartActivity.this, TeacherActivity.class);
+                        startActivity(intent);
+                        finish();
                     }
                 })
                 .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
@@ -41,7 +43,9 @@ public class StartActivity extends Activity {
                 .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        //TODO start client mode
+                        Intent intent = new Intent(StartActivity.this, StudentActivity.class);
+                        startActivity(intent);
+                        finish();
                     }
                 })
                 .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {

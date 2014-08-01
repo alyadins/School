@@ -9,7 +9,14 @@
     <string name="server_warning">Приложение будет работать в режиме СЕРВЕР \"УЧИТЕЛЬ\". Выбранный режим невозможно будет в дальнейшем изменить. Вы уверены?</string>
     <string name="client_warning">Приложение будет работать в режиме КЛИЕНТ \"УЧЕНИК\". Выбранный режим невозможно будет в дальнейшем изменить. Вы уверены?</string>
 
-
+    <!-- Login data -->
+    <string name="last_name">Фамилия</string>
+    <string name="name">Имя</string>
+    <string name="second_name">Отчество</string>
+    <string name="subject">Предмет</string>
+    <string name="group">Класс</string>
+    <string name="enter_user_name">Введите имя пользователя</string>
+    
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>
 
