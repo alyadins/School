@@ -1,7 +1,5 @@
 package ru.appkode.school.network;
 
-import android.util.Log;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -24,6 +22,8 @@ public class Connection {
 
     private Thread mSendingThread;
     private Thread mReceivingThread;
+
+    private OnMessageReceivedListener mOnMessageRecievedListener;
 
     public Connection(Socket socket) {
         mSocket = socket;
@@ -60,7 +60,11 @@ public class Connection {
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                mWriter.close();
+                try {
+                    mSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
@@ -70,25 +74,31 @@ public class Connection {
         @Override
         public void run() {
             try {
-                try {
-                    mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
+                mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
 
-                    while (!Thread.currentThread().isInterrupted()) {
-                        String message = null;
-                        message = mReader.readLine();
-                        if (message != null) {
-                            processMessage(message);
+                while (!Thread.currentThread().isInterrupted()) {
+                    String message = null;
+                    message = mReader.readLine();
+                    if (message != null) {
+                        if (message.equals("END")) {
+                            break;
                         }
+                        processMessage(message);
+                    } else {
+                        break;
                     }
-                } finally {
-                    mReader.close();
                 }
-            } catch (IOException io) {
-                io.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    mSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
+
         }
-
-
     }
 
     public void sendMessage(String message) {
@@ -96,6 +106,18 @@ public class Connection {
     }
 
     private void processMessage(String message) {
-        Log.d("TEST", "message recived = " + message);
+       if (mOnMessageRecievedListener != null) {
+           mOnMessageRecievedListener.onReceiveMessage(this, message);
+       } else {
+           throw new NullPointerException("set OnMessageReceivedListener");
+       }
+    }
+
+    interface OnMessageReceivedListener {
+        public void onReceiveMessage(Connection connection, String message);
+    }
+
+    public void setOnMessageReceivedListener(OnMessageReceivedListener l) {
+        mOnMessageRecievedListener = l;
     }
 }

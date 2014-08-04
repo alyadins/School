@@ -46,6 +46,8 @@ public class TeacherActivity extends Activity {
     private RegistrationServer mServer;
     private NsdHelper mNsdHelper;
 
+    private String mServerName;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -109,26 +111,17 @@ public class TeacherActivity extends Activity {
 
 
     private void startServer() {
-        if (mServer == null)
-            mServer = new RegistrationServer();
+
+        if (mServer == null) {
+            mServer = new RegistrationServer(mServerName);
+            mServer.setTeacherInfo(mTeacherInfo);
+        }
         mServer.start();
 
         if (mNsdHelper == null)
             mNsdHelper = new NsdHelper(this);
 
-
-        StringBuffer buffer = new StringBuffer();
-        buffer.append(mTeacherInfo.name)
-                .append(" ")
-                .append(mTeacherInfo.secondName)
-                .append(" ")
-                .append(mTeacherInfo.lastName)
-                .append(" ")
-                .append(mTeacherInfo.subject);
-
-
-        String serviceName = "serv" + StringUtil.md5(buffer.toString());
-        mNsdHelper.setServiceName(serviceName);
+        mNsdHelper.setServiceName(mServerName);
         mNsdHelper.initializeNsd();
         if (mServer.getPort() > -1)
             mNsdHelper.registerService(mServer.getPort());
@@ -164,7 +157,17 @@ public class TeacherActivity extends Activity {
 
         generateFakeClients();
 
-        mClientListFragment.setClients(mClients);
+      //  mClientListFragment.setClients(mClients);
+
+        StringBuffer buffer = new StringBuffer();
+        buffer.append(mTeacherInfo.name)
+                .append(" ")
+                .append(mTeacherInfo.secondName)
+                .append(" ")
+                .append(mTeacherInfo.lastName)
+                .append(" ")
+                .append(mTeacherInfo.subject);
+        mServerName = "serv" + StringUtil.md5(buffer.toString());
     }
 
     private void generateFakeClients() {
