@@ -17,6 +17,8 @@ import ru.appkode.school.R;
  */
 public class TabsFragment extends Fragment {
 
+    public static final String TAG = "tabsFragment";
+
     private static final String LEFT = "left";
     private static final String RIGHT = "right";
 

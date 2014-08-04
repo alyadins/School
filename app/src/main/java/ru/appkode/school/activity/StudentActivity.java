@@ -3,12 +3,10 @@ package ru.appkode.school.activity;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -18,9 +16,9 @@ import android.view.View;
 import ru.appkode.school.R;
 import ru.appkode.school.data.StudentInfo;
 import ru.appkode.school.fragment.ServerListFragment;
+import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
-import ru.appkode.school.fragment.UserInfoFragment;
-import ru.appkode.school.util.StringUtil;
+import ru.appkode.school.network.NsdHelper;
 
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
@@ -32,10 +30,12 @@ public class StudentActivity extends Activity {
 
     private StudentInfo mStudentInfo;
 
-    private UserInfoFragment mUserInfoFragment;
+    private StudentInfoFragment mStudentInfoFragment;
     private TabsFragment mTabsFragment;
 
     private FragmentManager mFragmentManager;
+
+    private NsdHelper mNsdHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,23 +43,22 @@ public class StudentActivity extends Activity {
         setContentView(R.layout.activity_student);
         showStudentLoginDialog();
 
-        if (mUserInfoFragment == null) {
-            mUserInfoFragment = new UserInfoFragment();
-            mFragmentManager = getFragmentManager();
+        mFragmentManager = getFragmentManager();
+        mStudentInfoFragment = (StudentInfoFragment) mFragmentManager.findFragmentByTag(StudentInfoFragment.TAG);
 
+        if (mStudentInfoFragment == null) {
+            mStudentInfoFragment = new StudentInfoFragment();
             FragmentTransaction transaction = mFragmentManager.beginTransaction();
-            transaction.add(R.id.user_info, mUserInfoFragment, null);
+            transaction.add(R.id.user_info, mStudentInfoFragment, StudentInfoFragment.TAG);
             transaction.commit();
         }
 
+        mTabsFragment = (TabsFragment) mFragmentManager.findFragmentByTag(TabsFragment.TAG);
         if (mTabsFragment == null) {
             mTabsFragment = new TabsFragment();
-            mFragmentManager = getFragmentManager();
-
             FragmentTransaction transaction = mFragmentManager.beginTransaction();
             transaction.add(R.id.server_info, mTabsFragment);
             transaction.commit();
-
 
             mTabsFragment.setLeftTitle(getString(R.string.favourites));
             mTabsFragment.setRightTitle(getString(R.string.server_list));
@@ -68,6 +67,18 @@ public class StudentActivity extends Activity {
             ServerListFragment slf2 = new ServerListFragment();
             mTabsFragment.setRightFragment(slf2);
         }
+
+        discoverServices();
+    }
+
+    private void discoverServices() {
+        if (mNsdHelper == null) {
+            mNsdHelper = new NsdHelper(this);
+            mNsdHelper.initializeDiscoveryListener();
+            mNsdHelper.initializeResolveListener();
+        }
+
+        mNsdHelper.discoverServices();
     }
 
     @Override
@@ -126,8 +137,8 @@ public class StudentActivity extends Activity {
 
     private void setUserInfo() {
 
-        mUserInfoFragment.setUserName(mStudentInfo.name + " " + mStudentInfo.lastName);
-        mUserInfoFragment.setGroup(mStudentInfo.group);
-        mUserInfoFragment.setBlock(true);
+        mStudentInfoFragment.setUserName(mStudentInfo.name + " " + mStudentInfo.lastName);
+        mStudentInfoFragment.setGroup(mStudentInfo.group);
+        mStudentInfoFragment.setBlock(true);
     }
 }

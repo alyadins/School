@@ -15,7 +15,9 @@ import ru.appkode.school.util.StringUtil;
 /**
  * Created by lexer on 01.08.14.
  */
-public class UserInfoFragment extends Fragment {
+public class StudentInfoFragment extends Fragment {
+
+    public static final String TAG = "studentInfoFragment";
 
     private boolean mIsBlock = false;
     private String mUserName = "";

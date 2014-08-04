@@ -40,6 +40,13 @@
     <string name="favourites">Избранное</string>
     <string name="server_list">Список серверов</string>
 
+    <!-- teacher screen -->
+    <string name="to_block">Заблокировать</string>
+    <string name="to_unblock">Разблокировать</string>
+    <string name="to_delete">Удалить</string>
+    <string name="other_teacher_lock">Заблокированно другим учителем</string>
+    <string name="select_all">Выбрать всех</string>
+
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>
 
