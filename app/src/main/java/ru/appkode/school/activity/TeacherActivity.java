@@ -78,9 +78,9 @@ public class TeacherActivity extends Activity {
 
     @Override
     protected void onPause() {
+        super.onPause();
         if (mServer != null)
             mServer.unregisterService();
-        super.onPause();
     }
 
     @Override

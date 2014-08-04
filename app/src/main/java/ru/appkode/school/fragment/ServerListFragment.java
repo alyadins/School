@@ -3,6 +3,7 @@ package ru.appkode.school.fragment;
 import android.app.Fragment;
 import android.app.ListFragment;
 import android.os.Bundle;
+import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,8 +18,10 @@ import ru.appkode.school.gui.ServerListAdapter;
  */
 public class ServerListFragment extends ListFragment {
 
-
+    public static final String TAG = "ServerListFragment";
     private List<ServerInfo> mServerList;
+
+    private ServerListAdapter mAdapter;
 
     Random random = new Random();
     @Override
@@ -26,10 +29,20 @@ public class ServerListFragment extends ListFragment {
         super.onActivityCreated(savedInstanceState);
         mServerList = new ArrayList<ServerInfo>();
 
-        ServerListAdapter adapter = new ServerListAdapter(getActivity(), R.layout.server_list_item, mServerList);
-        setListAdapter(adapter);
+        setServerList(mServerList);
+    }
 
-        generateServerList();
+    public void setServerList(List<ServerInfo> serverList) {
+        mServerList = serverList;
+        if (serverList != null) {
+            if (mAdapter == null) {
+                mAdapter = new ServerListAdapter(getActivity(), R.layout.server_list_item, mServerList);
+                setListAdapter(mAdapter);
+            } else {
+                Log.d("TEST", "notify");
+                mAdapter.setData(serverList);
+            }
+        }
     }
 
     private void generateServerList() {

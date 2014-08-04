@@ -26,6 +26,8 @@ public class TabsFragment extends Fragment {
     private Fragment mRightFragment;
     private String mLeftTitle;
     private String mRightTitle;
+    private String mLeftTag;
+    private String mRightTag;
 
     private TabHost mTabHost;
 
@@ -51,8 +53,8 @@ public class TabsFragment extends Fragment {
 
         setLeftTitle(mLeftTitle);
         setRightTitle(mRightTitle);
-        setLeftFragment(mLeftFragment);
-        setRightFragment(mRightFragment);
+        setLeftFragment(mLeftFragment, mLeftTag);
+        setRightFragment(mRightFragment, mRightTag);
 
         return v;
     }
@@ -68,21 +70,23 @@ public class TabsFragment extends Fragment {
         setTitle(mRightTitle, 1);
     }
 
-    public void setLeftFragment(Fragment fragment) {
+    public void setLeftFragment(Fragment fragment, String tag) {
+        mLeftTag = tag;
         if (mLeftFragment != null && fragment.getId() == mLeftFragment.getId())
             return;
         mLeftFragment = fragment;
         FragmentTransaction transaction = getFragmentManager().beginTransaction();
-        transaction.add(R.id.left_tab, mLeftFragment);
+        transaction.add(R.id.left_tab, mLeftFragment, tag);
         transaction.commit();
     }
 
-    public void setRightFragment(Fragment fragment) {
+    public void setRightFragment(Fragment fragment, String tag) {
+        mRightTag = tag;
         if (mRightFragment != null && fragment.getId() == mRightFragment.getId())
             return;
         mRightFragment = fragment;
         FragmentTransaction transaction = getFragmentManager().beginTransaction();
-        transaction.add(R.id.right_tab, mRightFragment);
+        transaction.add(R.id.right_tab, mRightFragment, tag);
         transaction.commit();
     }
 

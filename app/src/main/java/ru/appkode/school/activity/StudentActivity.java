@@ -7,13 +7,17 @@ import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
+import java.util.List;
+
 import ru.appkode.school.R;
+import ru.appkode.school.data.ServerInfo;
 import ru.appkode.school.data.StudentInfo;
 import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
@@ -26,7 +30,7 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 /**
  * Created by lexer on 01.08.14.
  */
-public class StudentActivity extends Activity {
+public class StudentActivity extends Activity implements ClientConnection.OnTeacherListChanged {
 
     private StudentInfo mStudentInfo;
 
@@ -36,6 +40,10 @@ public class StudentActivity extends Activity {
     private FragmentManager mFragmentManager;
 
     private ClientConnection mClientConnection;
+
+    private List<ServerInfo> mServersInfo;
+
+    private ServerListFragment mServerListFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,13 +70,19 @@ public class StudentActivity extends Activity {
 
             mTabsFragment.setLeftTitle(getString(R.string.favourites));
             mTabsFragment.setRightTitle(getString(R.string.server_list));
-            ServerListFragment slf1 = new ServerListFragment();
-            mTabsFragment.setLeftFragment(slf1);
+
+            mServerListFragment = (ServerListFragment) mFragmentManager.findFragmentByTag(ServerListFragment.TAG + "1");
+            if (mServerListFragment == null) {
+                mServerListFragment = new ServerListFragment();
+                mTabsFragment.setRightFragment(mServerListFragment, ServerListFragment.TAG + "1");
+            }
             ServerListFragment slf2 = new ServerListFragment();
-            mTabsFragment.setRightFragment(slf2);
+            mTabsFragment.setLeftFragment(slf2, ServerListFragment.TAG + "2");
         }
 
         mClientConnection = new ClientConnection(this);
+        mClientConnection.setOnTeacherListChangedListener(this);
+
     }
 
     @Override
@@ -94,10 +108,29 @@ public class StudentActivity extends Activity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.refresh) {
-          //  mClientConnection.stopDiscover();
+            Log.d("TEST", "onOption");
+            mClientConnection.stopDiscover();
             mClientConnection.discover();
+        } else
+        if (item.getItemId() == R.id.about) {
+            Log.d("TEST", "setting list with length = " + mServersInfo.size());
+            mServerListFragment.setServerList(mClientConnection.getServersInfo());
         }
+
         return super.onOptionsItemSelected(item);
+    }
+
+
+    @Override
+    public void onTeacherListChanged(ClientConnection connection, List<ServerInfo> serversInfo) {
+        Log.d("TEST", "on teacher list changed");
+        mServersInfo = serversInfo;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mServerListFragment.setServerList(mServersInfo);
+            }
+        });
     }
 
     private void showStudentLoginDialog() {

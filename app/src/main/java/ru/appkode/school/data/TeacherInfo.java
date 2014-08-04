@@ -9,6 +9,9 @@ public class TeacherInfo {
     public String secondName;
     public String subject;
 
+    public TeacherInfo() {
+    }
+
     public TeacherInfo(String lastName, String name, String secondName, String subject) {
         this.lastName = lastName;
         this.name = name;
@@ -16,5 +19,10 @@ public class TeacherInfo {
         this.subject = subject;
     }
 
-
+    public void setTeacherInfo(TeacherInfo info) {
+        this.lastName = info.lastName;
+        this.name = info.name;
+        this.secondName = info.name;
+        this.subject = info.subject;
+    }
 }

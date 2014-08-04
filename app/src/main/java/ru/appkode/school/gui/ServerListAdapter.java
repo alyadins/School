@@ -1,6 +1,7 @@
 package ru.appkode.school.gui;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +14,7 @@ import java.util.List;
 
 import ru.appkode.school.R;
 import ru.appkode.school.data.ServerInfo;
+import ru.appkode.school.data.TeacherInfo;
 
 /**
  * Created by lexer on 01.08.14.
@@ -31,6 +33,7 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
 
+        Log.d("TEST", "getView");
         ViewHolder holder;
 
         View v = convertView;
@@ -48,11 +51,23 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
         }
 
         ServerInfo server = mServers.get(position);
-        holder.name.setText(server.name);
-        holder.subject.setText(server.subject);
+        TeacherInfo info = server.teacherInfo;
+
+        String fullTeacherName = info.name + " " + info.secondName + " " + " " + info.lastName + " ";
+
+        holder.name.setText(fullTeacherName);
+        holder.subject.setText(info.subject);
         holder.isConnected.setChecked(server.isConnected);
 
         return v;
+    }
+
+    public void setData(List<ServerInfo> serverList) {
+        mServers.clear();
+        mServers.addAll(serverList);
+        Log.d("TEST", "setData");
+
+        notifyDataSetChanged();
     }
 
     private class ViewHolder {
