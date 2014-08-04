@@ -1,5 +1,8 @@
 package ru.appkode.school.network;
 
+import android.content.Context;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -16,11 +19,10 @@ import ru.appkode.school.data.TeacherInfo;
 /**
  * Created by lexer on 01.08.14.
  */
-public class RegistrationServer implements Connection.OnMessageReceivedListener {
+public class Server implements Connection.OnMessageReceivedListener, NsdManager.RegistrationListener {
 
-    private static final String TAG = "RegistrationServer";
-
-    private Socket mSocket = null;
+    public static final String SERVICE_TYPE = "_http._tcp.";
+    private Context mContext;
     private ServerSocket mServerSocket = null;
     private int mPort = -1;
 
@@ -30,9 +32,13 @@ public class RegistrationServer implements Connection.OnMessageReceivedListener 
 
     private TeacherInfo mTeacherInfo;
 
+    private NsdManager mNsdManager;
+    private boolean mIsRegistered;
 
-    public RegistrationServer(String serverName) {
+    public Server(Context context, String serverName) {
         mServerName = serverName;
+        mContext = context;
+        mNsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
         connections = new ArrayList<Connection>();
     }
 
@@ -43,10 +49,10 @@ public class RegistrationServer implements Connection.OnMessageReceivedListener 
             try {
                 mServerSocket = new ServerSocket(0);
                 mPort = mServerSocket.getLocalPort();
+                registerService(mPort);
 
-                Log.d("TEST", mPort + "");
+                Log.d("TEST", "port = " + mPort + "");
                 while (!Thread.currentThread().isInterrupted()) {
-                    Log.d(TAG, "Server socket created.");
                     Socket socket = mServerSocket.accept();
                     startConnection(socket);
                 }
@@ -126,4 +132,56 @@ public class RegistrationServer implements Connection.OnMessageReceivedListener 
         Thread thread = new Thread(new ServerThread());
         thread.start();
     }
+
+    private void registerService(int port) {
+        NsdServiceInfo serviceInfo  = new NsdServiceInfo();
+        serviceInfo.setPort(port);
+        serviceInfo.setServiceName(mServerName);
+        serviceInfo.setServiceType(SERVICE_TYPE);
+
+        mNsdManager.registerService(
+                serviceInfo, NsdManager.PROTOCOL_DNS_SD, this);
+
+    }
+
+    public void stop() {
+
+        mNsdManager.unregisterService(this);
+    }
+
+    public void registerService() {
+        if (mPort > -1 && !mIsRegistered && !mServerSocket.isClosed()) {
+            registerService(mPort);
+        }
+    }
+
+    public void unregisterService() {
+        if (mIsRegistered)
+            mNsdManager.unregisterService(this);
+    }
+
+    @Override
+    public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
+        Log.d("TEST", "registration failed");
+        mIsRegistered = false;
+    }
+
+    @Override
+    public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
+        Log.d("TEST", "unregistaion failed");
+        mIsRegistered = false;
+    }
+
+    @Override
+    public void onServiceRegistered(NsdServiceInfo serviceInfo) {
+        Log.d("TEST", "registration successful");
+        mIsRegistered = true;
+    }
+
+    @Override
+    public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
+        Log.d("TEST", "unregistration successful");
+        mIsRegistered = false;
+    }
+
 }

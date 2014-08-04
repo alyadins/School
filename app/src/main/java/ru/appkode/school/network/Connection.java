@@ -16,6 +16,7 @@ import java.util.concurrent.BlockingQueue;
 public class Connection {
 
     private Socket mSocket;
+    private int mPort;
     private BufferedReader mReader;
     private PrintWriter mWriter;
     private BlockingQueue<String> mMessageQueue;
@@ -23,10 +24,11 @@ public class Connection {
     private Thread mSendingThread;
     private Thread mReceivingThread;
 
-    private OnMessageReceivedListener mOnMessageRecievedListener;
+    private OnMessageReceivedListener mOnMessageReceivedListener;
 
     public Connection(Socket socket) {
         mSocket = socket;
+        mPort = socket.getLocalPort();
     }
 
     public void start() throws IOException {
@@ -101,13 +103,17 @@ public class Connection {
         }
     }
 
+    public int getPort() {
+        return mPort;
+    }
+
     public void sendMessage(String message) {
         mMessageQueue.add(message);
     }
 
     private void processMessage(String message) {
-       if (mOnMessageRecievedListener != null) {
-           mOnMessageRecievedListener.onReceiveMessage(this, message);
+       if (mOnMessageReceivedListener != null) {
+           mOnMessageReceivedListener.onReceiveMessage(this, message);
        } else {
            throw new NullPointerException("set OnMessageReceivedListener");
        }
@@ -118,6 +124,6 @@ public class Connection {
     }
 
     public void setOnMessageReceivedListener(OnMessageReceivedListener l) {
-        mOnMessageRecievedListener = l;
+        mOnMessageReceivedListener = l;
     }
 }

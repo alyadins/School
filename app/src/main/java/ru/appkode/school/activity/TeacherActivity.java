@@ -6,14 +6,11 @@ import android.app.Dialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -23,8 +20,7 @@ import ru.appkode.school.data.Client;
 import ru.appkode.school.data.TeacherInfo;
 import ru.appkode.school.fragment.ClientListFragment;
 import ru.appkode.school.fragment.TeacherInfoFragment;
-import ru.appkode.school.network.NsdHelper;
-import ru.appkode.school.network.RegistrationServer;
+import ru.appkode.school.network.Server;
 import ru.appkode.school.util.StringUtil;
 
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
@@ -43,8 +39,7 @@ public class TeacherActivity extends Activity {
 
     private List<Client> mClients;
 
-    private RegistrationServer mServer;
-    private NsdHelper mNsdHelper;
+    private Server mServer;
 
     private String mServerName;
 
@@ -72,6 +67,26 @@ public class TeacherActivity extends Activity {
             transaction.add(R.id.client_list, mClientListFragment, ClientListFragment.TAG);
             transaction.commit();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mServer != null)
+           mServer.registerService();
+    }
+
+    @Override
+    protected void onPause() {
+        if (mServer != null)
+            mServer.unregisterService();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        mServer.stop();
+        super.onDestroy();
     }
 
     @Override
@@ -111,20 +126,11 @@ public class TeacherActivity extends Activity {
 
 
     private void startServer() {
-
         if (mServer == null) {
-            mServer = new RegistrationServer(mServerName);
+            mServer = new Server(this, mServerName);
             mServer.setTeacherInfo(mTeacherInfo);
         }
         mServer.start();
-
-        if (mNsdHelper == null)
-            mNsdHelper = new NsdHelper(this);
-
-        mNsdHelper.setServiceName(mServerName);
-        mNsdHelper.initializeNsd();
-        if (mServer.getPort() > -1)
-            mNsdHelper.registerService(mServer.getPort());
     }
 
     private void loadTeacherData(View v, Dialog dialog) {
@@ -144,8 +150,6 @@ public class TeacherActivity extends Activity {
         dialog.dismiss();
 
         setTeacherInfo();
-
-        startServer();
     }
 
     private void setTeacherInfo() {
@@ -168,6 +172,8 @@ public class TeacherActivity extends Activity {
                 .append(" ")
                 .append(mTeacherInfo.subject);
         mServerName = "serv" + StringUtil.md5(buffer.toString());
+
+        startServer();
     }
 
     private void generateFakeClients() {

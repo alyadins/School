@@ -18,7 +18,7 @@ import ru.appkode.school.data.StudentInfo;
 import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
-import ru.appkode.school.network.NsdHelper;
+import ru.appkode.school.network.ClientConnection;
 
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
@@ -35,7 +35,7 @@ public class StudentActivity extends Activity {
 
     private FragmentManager mFragmentManager;
 
-    private NsdHelper mNsdHelper;
+    private ClientConnection mClientConnection;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,17 +68,19 @@ public class StudentActivity extends Activity {
             mTabsFragment.setRightFragment(slf2);
         }
 
-        discoverServices();
+        mClientConnection = new ClientConnection(this);
     }
 
-    private void discoverServices() {
-        if (mNsdHelper == null) {
-            mNsdHelper = new NsdHelper(this);
-            mNsdHelper.initializeDiscoveryListener();
-            mNsdHelper.initializeResolveListener();
-        }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mClientConnection.discover();
+    }
 
-        mNsdHelper.discoverServices();
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mClientConnection.stopDiscover();
     }
 
     @Override
@@ -91,7 +93,10 @@ public class StudentActivity extends Activity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        //TODO add handlers
+        if (item.getItemId() == R.id.refresh) {
+          //  mClientConnection.stopDiscover();
+            mClientConnection.discover();
+        }
         return super.onOptionsItemSelected(item);
     }
 
