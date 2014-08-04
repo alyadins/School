@@ -17,6 +17,8 @@ public class RegistrationServer {
     private ServerSocket mServerSocket = null;
     private int mPort = -1;
 
+    private Connection mConnection;
+
 
     public RegistrationServer() {
     }
@@ -29,14 +31,26 @@ public class RegistrationServer {
                 mServerSocket = new ServerSocket(0);
                 mPort = mServerSocket.getLocalPort();
 
+                Log.d("TEST", mPort + "");
                 while (!Thread.currentThread().isInterrupted()) {
                     Log.d(TAG, "Server socket created.");
                     mSocket = mServerSocket.accept();
+                    startConnection();
                 }
 
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    private void startConnection() {
+        mConnection = new Connection(mSocket);
+        try {
+            mConnection.start();
+            mConnection.sendMessage("Hello world");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
