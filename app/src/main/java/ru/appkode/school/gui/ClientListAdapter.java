@@ -1,30 +1,33 @@
 package ru.appkode.school.gui;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.util.List;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.Client;
+import ru.appkode.school.data.ClientInfo;
+
 
 /**
  * Created by lexer on 02.08.14.
  */
-public class ClientListAdapter extends ArrayAdapter<Client> {
+public class ClientListAdapter extends ArrayAdapter<ClientInfo> {
 
-    private List<Client> mClients;
+    private List<ClientInfo> mClientsInfo;
     private int mResId;
 
-    public ClientListAdapter(Context context, int resource, List<Client> clients) {
-        super(context, resource, clients);
-        mClients = clients;
+    public ClientListAdapter(Context context, int resource, List<ClientInfo> clientsInfo) {
+        super(context, resource, clientsInfo);
+        mClientsInfo = clientsInfo;
         mResId = resource;
     }
 
@@ -47,19 +50,33 @@ public class ClientListAdapter extends ArrayAdapter<Client> {
             holder = (ViewHolder) v.getTag();
         }
 
-        Client client = mClients.get(position);
-        holder.group.setText(client.group);
-        holder.name.setText(client.name);
+        final ClientInfo clientInfo = mClientsInfo.get(position);
+        holder.group.setText(clientInfo.group);
+        holder.name.setText(clientInfo.name + " " + clientInfo.lastName);
 
-        if (client.isLocketByOther) {
+        if (clientInfo.isBlockedByOther) {
             holder.otherBlock.setVisibility(View.GONE);
         } else {
             holder.otherBlock.setVisibility(View.VISIBLE);
         }
 
-        holder.isSelected.setChecked(client.isChosen);
+        holder.isSelected.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                clientInfo.isChosen = isChecked;
+            }
+        });
+        holder.isSelected.setChecked(clientInfo.isChosen);
 
         return v;
+    }
+
+    public void setClientsList(List<ClientInfo> clientsInfo) {
+        if (mClientsInfo != clientsInfo) {
+            mClientsInfo.clear();
+            mClientsInfo.addAll(clientsInfo);
+        }
+        notifyDataSetChanged();
     }
 
     private class ViewHolder {

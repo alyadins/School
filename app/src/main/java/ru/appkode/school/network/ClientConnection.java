@@ -13,6 +13,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+import ru.appkode.school.data.ClientInfo;
 import ru.appkode.school.data.ServerInfo;
 import ru.appkode.school.data.TeacherInfo;
 
@@ -20,18 +21,22 @@ import ru.appkode.school.data.TeacherInfo;
 /**
  * Created by lexer on 04.08.14.
  */
-public class ClientConnection implements NsdManager.ResolveListener, NsdManager.DiscoveryListener {
+public class ClientConnection implements NsdManager.ResolveListener, NsdManager.DiscoveryListener, Connection.OnMessageReceivedListener {
 
     public static final String SERVICE_TYPE = "_http._tcp.";
 
+    private static final String TAG = "ClientConnection";
+
     private Context mContext;
     private NsdManager mNsdManager;
-    private Connection mConnection;
     private List<ServerInfo> mServersInfo;
 
     private boolean mIsDiscoveryStarted = false;
 
+    private Connection mConnection;
+
     private OnTeacherListChanged mOnTeacherListChanged;
+    private OnStatusChanged mOnStatusChanged;
 
     public ClientConnection(Context context) {
         mContext = context;
@@ -43,7 +48,7 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
         Log.d("TEST", mIsDiscoveryStarted + " isStarted");
         if (!mIsDiscoveryStarted)
             mNsdManager.discoverServices(
-                SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
+                    SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
     }
 
     public void stopDiscover() {
@@ -105,7 +110,6 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
                 && !isServiceAdded(serviceInfo)) {
             askForTeacherInfo(serviceInfo);
         } else {
-            Log.d("TEST", serviceName + " already added");
         }
     }
 
@@ -147,20 +151,33 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
             connection.setOnMessageReceivedListener(new Connection.OnMessageReceivedListener() {
                 @Override
                 public void onReceiveMessage(Connection connection, String message) {
-                    addService(serviceInfo, parseTeacherInfoJson(message));
-                    connection.sendMessage("END");
+                    if (parseCode(message) == Server.INFO) {
+                        addService(serviceInfo, parseTeacherInfoJson(message));
+                        connection.sendMessage("END");
+                    }
                 }
             });
             connection.start();
-            connection.sendMessage("info");
+            connection.sendMessage(getInfoJson());
         } catch (IOException e) {
             e.printStackTrace();
         }
         return info;
     }
 
+    private int parseCode(String message) {
+        int code = 0;
+        try {
+            JSONObject json = new JSONObject(message);
+            code = json.getInt("code");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return code;
+    }
+
     private void addService(NsdServiceInfo serviceInfo, TeacherInfo teacherInfo) {
-        Log.d("TEST", "adding serivce teacherInfo" + serviceInfo.getServiceName());
         ServerInfo info = new ServerInfo();
         info.serviceInfo = serviceInfo;
         info.teacherInfo = teacherInfo;
@@ -188,6 +205,100 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
 
     public List<ServerInfo> getServersInfo() {
         return mServersInfo;
+    }
+
+    public void connectToServer(ServerInfo info, ClientInfo clientInfo) {
+        NsdServiceInfo serviceInfo = info.serviceInfo;
+        try {
+            mConnection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
+            mConnection.start();
+            mConnection.setOnMessageReceivedListener(this);
+            mConnection.sendMessage(getConnectJson(clientInfo));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void disconnectFromServer(ClientInfo clientInfo) {
+        if (!mConnection.isConnected()) {
+            try {
+                mConnection.start();
+                mConnection.setOnMessageReceivedListener(this);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        mConnection.sendMessage(getDisconnectJson(clientInfo));
+    }
+
+    @Override
+    public void onReceiveMessage(Connection connection, String message) {
+        Log.d("TEST", message);
+        int code =  parseCode(message);
+        //200
+        switch (code) {
+            case Server.CONNECTED:
+                Log.d(TAG, "connected");
+                break;
+            case Server.DISCONNECTED:
+                Log.d(TAG, "disconnected");
+                break;
+        }
+        if (code / 100 == 5) {
+            mOnStatusChanged.OnStatusChanged(code);
+        }
+        if (code / 100 == 4) {
+            Log.e(TAG, "server error");
+        }
+    }
+
+
+    private String getConnectJson(ClientInfo info) {
+        JSONObject json = new JSONObject();
+        try {
+            json.put("method", "connect");
+            json.put("name", info.name);
+            json.put("last_name", info.lastName);
+            json.put("group", info.group);
+            json.put("id", info.clientId);
+            json.put("block", info.isBlocked);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return json.toString();
+    }
+
+    private String getDisconnectJson(ClientInfo info) {
+        JSONObject jsonObject = new JSONObject();
+        try {
+            jsonObject.put("id", info.clientId);
+            jsonObject.put("method", "disconnect");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return jsonObject.toString();
+    }
+
+
+    private String getInfoJson() {
+        JSONObject json = new JSONObject();
+        try {
+            json.put("method", "info");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return json.toString();
+    }
+
+    public void setOnstatusChangedListener(OnStatusChanged l) {
+        mOnStatusChanged = l;
+    }
+
+    public interface OnStatusChanged {
+        public void OnStatusChanged(int status);
     }
 
     public void setOnTeacherListChangedListener(OnTeacherListChanged l) {

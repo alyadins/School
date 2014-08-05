@@ -17,12 +17,14 @@ import android.view.View;
 import java.util.List;
 
 import ru.appkode.school.R;
+import ru.appkode.school.data.ClientInfo;
 import ru.appkode.school.data.ServerInfo;
-import ru.appkode.school.data.StudentInfo;
 import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
 import ru.appkode.school.network.ClientConnection;
+import ru.appkode.school.network.Server;
+import ru.appkode.school.util.StringUtil;
 
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
@@ -30,9 +32,9 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 /**
  * Created by lexer on 01.08.14.
  */
-public class StudentActivity extends Activity implements ClientConnection.OnTeacherListChanged {
+public class StudentActivity extends Activity implements ClientConnection.OnTeacherListChanged, ServerListFragment.OnServerChosen, ClientConnection.OnStatusChanged {
 
-    private StudentInfo mStudentInfo;
+    private ClientInfo mClientInfo;
 
     private StudentInfoFragment mStudentInfoFragment;
     private TabsFragment mTabsFragment;
@@ -74,6 +76,7 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
             mServerListFragment = (ServerListFragment) mFragmentManager.findFragmentByTag(ServerListFragment.TAG + "1");
             if (mServerListFragment == null) {
                 mServerListFragment = new ServerListFragment();
+                mServerListFragment.setOnServerChosenListener(this);
                 mTabsFragment.setRightFragment(mServerListFragment, ServerListFragment.TAG + "1");
             }
             ServerListFragment slf2 = new ServerListFragment();
@@ -82,7 +85,7 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
 
         mClientConnection = new ClientConnection(this);
         mClientConnection.setOnTeacherListChangedListener(this);
-
+        mClientConnection.setOnstatusChangedListener(this);
     }
 
     @Override
@@ -95,6 +98,13 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
     protected void onPause() {
         super.onPause();
         mClientConnection.stopDiscover();
+    }
+
+    @Override
+    protected void onStop() {
+        Log.d("TEST", "onstop");
+        mClientConnection.disconnectFromServer(mClientInfo);
+        super.onStop();
     }
 
     @Override
@@ -120,6 +130,10 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    public void onServerChosen(ServerInfo info) {
+        mClientConnection.connectToServer(info, mClientInfo);
+    }
 
     @Override
     public void onTeacherListChanged(ClientConnection connection, List<ServerInfo> serversInfo) {
@@ -166,17 +180,37 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
                 checkForEmpty(this, group, R.string.error_enter_group))
             return;
 
-        mStudentInfo = new StudentInfo(name, lastName, group);
+        String clientId = "client" + StringUtil.md5(name + lastName + group);
+        mClientInfo = new ClientInfo(name, lastName, group);
+        mClientInfo.clientId = clientId;
 
         dialog.dismiss();
 
         setUserInfo();
     }
 
+    @Override
+    public void OnStatusChanged(final int status) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                switch (status) {
+                    case Server.BLOCK_CODE:
+                        mClientInfo.isBlocked = true;
+                        mStudentInfoFragment.setBlock(true);
+                        break;
+                    case Server.UNBLOCK_CODE:
+                        mClientInfo.isBlocked = false;
+                        mStudentInfoFragment.setBlock(false);
+                }
+            }
+        });
+    }
+
     private void setUserInfo() {
 
-        mStudentInfoFragment.setUserName(mStudentInfo.name + " " + mStudentInfo.lastName);
-        mStudentInfoFragment.setGroup(mStudentInfo.group);
+        mStudentInfoFragment.setUserName(mClientInfo.name + " " + mClientInfo.lastName);
+        mStudentInfoFragment.setGroup(mClientInfo.group);
         mStudentInfoFragment.setBlock(true);
     }
 }

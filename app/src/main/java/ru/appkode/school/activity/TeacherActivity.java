@@ -6,6 +6,7 @@ import android.app.Dialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -13,23 +14,24 @@ import android.view.View;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.Client;
+import ru.appkode.school.data.ClientInfo;
 import ru.appkode.school.data.TeacherInfo;
 import ru.appkode.school.fragment.ClientListFragment;
 import ru.appkode.school.fragment.TeacherInfoFragment;
 import ru.appkode.school.network.Server;
 import ru.appkode.school.util.StringUtil;
 
+import static ru.appkode.school.fragment.TeacherInfoFragment.*;
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
+
 
 /**
  * Created by lexer on 01.08.14.
  */
-public class TeacherActivity extends Activity {
+public class TeacherActivity extends Activity implements Server.OnClientListChanged, OnUserActionPerform {
 
     private TeacherInfo mTeacherInfo;
 
@@ -37,7 +39,7 @@ public class TeacherActivity extends Activity {
     private TeacherInfoFragment mTeacherInfoFragment;
     private ClientListFragment mClientListFragment;
 
-    private List<Client> mClients;
+    private List<ClientInfo> mClientsInfo;
 
     private Server mServer;
 
@@ -50,15 +52,17 @@ public class TeacherActivity extends Activity {
         showTeacherLoginDialog();
 
         mFragmentManager = getFragmentManager();
-        mClients = new ArrayList<Client>();
+        mClientsInfo = new ArrayList<ClientInfo>();
 
-        mTeacherInfoFragment = (TeacherInfoFragment) mFragmentManager.findFragmentByTag(TeacherInfoFragment.TAG);
+        mTeacherInfoFragment = (TeacherInfoFragment) mFragmentManager.findFragmentByTag(TAG);
         if (mTeacherInfoFragment == null) {
             mTeacherInfoFragment = new TeacherInfoFragment();
             FragmentTransaction transaction = mFragmentManager.beginTransaction();
-            transaction.add(R.id.teacher_info, mTeacherInfoFragment, TeacherInfoFragment.TAG);
+            transaction.add(R.id.teacher_info, mTeacherInfoFragment, TAG);
             transaction.commit();
         }
+
+        mTeacherInfoFragment.setOnUserActionPerformListener(this);
 
         mClientListFragment = (ClientListFragment) mFragmentManager.findFragmentByTag(ClientListFragment.TAG);
         if (mClientListFragment == null) {
@@ -103,6 +107,27 @@ public class TeacherActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+
+    @Override
+    public void onUserActionPerform(int action) {
+        List<ClientInfo> selectedClients = new ArrayList<ClientInfo>();
+        for (ClientInfo info : mClientsInfo) {
+            if (info.isChosen == true) {
+                selectedClients.add(info);
+            }
+        }
+        switch (action) {
+            case BLOCK:
+                mServer.block(selectedClients);
+                break;
+            case UNBLOCK:
+                mServer.unBlock(selectedClients);
+                break;
+            case DELETE:
+                break;
+        }
+    }
+
     private void showTeacherLoginDialog() {
         final View v = getLayoutInflater().inflate(R.layout.teacher_login_dialog, null);
 
@@ -124,11 +149,23 @@ public class TeacherActivity extends Activity {
         });
     }
 
+    @Override
+    public void onClientListChanged(final List<ClientInfo> clientsInfo) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mClientsInfo = clientsInfo;
+                mClientListFragment.setClients(mClientsInfo);
+            }
+        });
+    }
+
 
     private void startServer() {
         if (mServer == null) {
             mServer = new Server(this, mServerName);
             mServer.setTeacherInfo(mTeacherInfo);
+            mServer.setOnNewUserConnectedListener(this);
         }
         mServer.start();
     }
@@ -159,9 +196,7 @@ public class TeacherActivity extends Activity {
 
         mTeacherInfoFragment.setSubject(mTeacherInfo.subject);
 
-        generateFakeClients();
-
-      //  mClientListFragment.setClients(mClients);
+        mClientListFragment.setClients(mClientsInfo);
 
         StringBuffer buffer = new StringBuffer();
         buffer.append(mTeacherInfo.name)
@@ -176,17 +211,6 @@ public class TeacherActivity extends Activity {
         startServer();
     }
 
-    private void generateFakeClients() {
-        Random random = new Random();
-        for (int i = 0; i < 25; i++) {
-            Client client = new Client();
-            client.isLocked = random.nextBoolean();
-            client.name = "name " + i;
-            client.isLocketByOther = random.nextBoolean();
-            client.group = i + "Б";
-            client.isChosen = random.nextBoolean();
-            mClients.add(client);
-        }
-    }
+
 
 }

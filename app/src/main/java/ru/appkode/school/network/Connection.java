@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -15,7 +16,8 @@ import java.util.concurrent.BlockingQueue;
  */
 public class Connection {
 
-    private Socket mSocket;
+    private Socket mSocket = null;
+    private InetAddress mHost;
     private int mPort;
     private BufferedReader mReader;
     private PrintWriter mWriter;
@@ -25,6 +27,11 @@ public class Connection {
     private Thread mReceivingThread;
 
     private OnMessageReceivedListener mOnMessageReceivedListener;
+
+    public Connection(InetAddress host, int port) {
+        mHost = host;
+        mPort = port;
+    }
 
     public Connection(Socket socket) {
         mSocket = socket;
@@ -49,6 +56,9 @@ public class Connection {
         @Override
         public void run() {
             try {
+                if (mSocket == null) {
+                    mSocket = new Socket(mHost, mPort);
+                }
                 mWriter = new PrintWriter(new BufferedWriter(new OutputStreamWriter(mSocket.getOutputStream())), true);
                 while (true) {
                     try {
@@ -63,7 +73,8 @@ public class Connection {
                 e.printStackTrace();
             } finally {
                 try {
-                    mSocket.close();
+                    if (mSocket != null && !mSocket.isClosed())
+                        mSocket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -76,6 +87,9 @@ public class Connection {
         @Override
         public void run() {
             try {
+                if (mSocket == null) {
+                    mSocket = new Socket(mHost, mPort);
+                }
                 mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
 
                 while (!Thread.currentThread().isInterrupted()) {
@@ -94,13 +108,20 @@ public class Connection {
                 e.printStackTrace();
             } finally {
                 try {
-                    mSocket.close();
+                    if (mSocket != null && !mSocket.isClosed())
+                        mSocket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
 
         }
+    }
+
+    public boolean isConnected() {
+        if (mSocket != null && !mSocket.isClosed())
+            return true;
+        return false;
     }
 
     public int getPort() {

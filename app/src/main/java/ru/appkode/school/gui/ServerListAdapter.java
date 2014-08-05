@@ -21,6 +21,7 @@ import ru.appkode.school.data.TeacherInfo;
  */
 public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
 
+
     private List<ServerInfo> mServers;
     private int mResId;
 
@@ -33,7 +34,6 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
 
-        Log.d("TEST", "getView");
         ViewHolder holder;
 
         View v = convertView;
@@ -62,13 +62,13 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
         return v;
     }
 
+
     public void setData(List<ServerInfo> serverList) {
         mServers.clear();
         mServers.addAll(serverList);
-        Log.d("TEST", "setData");
-
         notifyDataSetChanged();
     }
+
 
     private class ViewHolder {
         ImageView statusImage;
@@ -76,4 +76,5 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
         TextView subject;
         Switch isConnected;
     }
+
 }
