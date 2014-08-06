@@ -96,8 +96,6 @@ public class Connection {
                     mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
                     while (!Thread.currentThread().isInterrupted()) {
                         String message = null;
-                        if (mSocket.isClosed())
-                            break;
                         message = mReader.readLine();
                         if (message != null) {
                             if (message.equals("END")) {
@@ -110,7 +108,6 @@ public class Connection {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
             } finally {
                closeConnection();
             }

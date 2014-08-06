@@ -231,12 +231,6 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
 
     public void disconnectFromServer(ClientInfo clientInfo) {
         if (mConnection != null) {
-            try {
-                mConnection.start();
-                mConnection.setOnMessageReceivedListener(this);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
             mConnection.sendMessage(getDisconnectJson(clientInfo));
         }
     }

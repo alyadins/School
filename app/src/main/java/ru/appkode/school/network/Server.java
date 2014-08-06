@@ -147,11 +147,14 @@ public class Server implements Connection.OnMessageReceivedListener, NsdManager.
     }
 
     public void disconnectAllClients() {
-        for (ClientInfo info : mClientsInfo) {
+        disconnect(mClientsInfo);
+    }
+    public void disconnect(List<ClientInfo> infoList) {
+        for (ClientInfo info : infoList) {
             info.connection.sendMessage(getDisconnectJson());
+            mClientsInfo.remove(info);
             info.connection.closeConnection();
         }
-        mClientsInfo.clear();
         if (mOnClientListChanged != null)
             mOnClientListChanged.onClientListChanged(mClientsInfo);
     }

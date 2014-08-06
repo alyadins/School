@@ -117,6 +117,7 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
                 mServer.unBlock(selectedClients);
                 break;
             case DELETE:
+                mServer.disconnect(selectedClients);
                 break;
         }
     }

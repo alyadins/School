@@ -225,6 +225,7 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
                     case Server.DISCONNECT:
                         info = getServerInfoById(serverId);
                         info.isConnected = false;
+                        mServerListFragment.setServerList(mServersInfo);
                         break;
                 }
             }
