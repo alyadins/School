@@ -87,13 +87,14 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
 
         mClientConnection = new ClientConnection(this);
         mClientConnection.setOnTeacherListChangedListener(this);
-        mClientConnection.setOnstatusChangedListener(this);
+        mClientConnection.setOnStatusChangedListener(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         mClientConnection.discover();
+        mServerListFragment.setServerList(mServersInfo);
     }
 
     @Override
@@ -104,7 +105,6 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
 
     @Override
     protected void onStop() {
-        Log.d("TEST", "onstop");
         mClientConnection.disconnectFromServer(mClientInfo);
         super.onStop();
     }

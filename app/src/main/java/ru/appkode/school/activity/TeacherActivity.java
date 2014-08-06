@@ -6,10 +6,12 @@ import android.app.Dialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +22,7 @@ import ru.appkode.school.data.ServerInfo;
 import ru.appkode.school.fragment.ClientListFragment;
 import ru.appkode.school.fragment.TeacherInfoFragment;
 import ru.appkode.school.network.Server;
+import ru.appkode.school.network.ServerNameChecker;
 import ru.appkode.school.util.StringUtil;
 
 import static ru.appkode.school.fragment.TeacherInfoFragment.*;
@@ -30,7 +33,7 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 /**
  * Created by lexer on 01.08.14.
  */
-public class TeacherActivity extends Activity implements Server.OnClientListChanged, OnUserActionPerform {
+public class TeacherActivity extends Activity implements Server.OnClientListChanged, OnUserActionPerform, ServerNameChecker.NameChecked {
 
     private ServerInfo mServerInfo;
 
@@ -43,6 +46,11 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
     private Server mServer;
 
     private String mServerName;
+
+    private ServerNameChecker mNameChecker;
+
+    private AlertDialog mDialog;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +78,8 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
             transaction.add(R.id.client_list, mClientListFragment, ClientListFragment.TAG);
             transaction.commit();
         }
+        mNameChecker = new ServerNameChecker(this);
+        mNameChecker.setNameCheckedListener(this);
     }
 
     @Override
@@ -122,6 +132,22 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
         }
     }
 
+    @Override
+    public void onNameChecked(final boolean isFree) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (isFree) {
+                    mDialog.dismiss();
+                    setTeacherInfo();
+                } else {
+                    Toast.makeText(TeacherActivity.this, "Занято", Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+
     private void showTeacherLoginDialog() {
         final View v = getLayoutInflater().inflate(R.layout.teacher_login_dialog, null);
 
@@ -132,13 +158,13 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
                 .setPositiveButton(R.string.ok, null)
                 .setNegativeButton(R.string.cancel, null);
 
-        final AlertDialog dialog = builder.create();
-        dialog.show();
+        mDialog = builder.create();
+        mDialog.show();
 
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+        mDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                loadTeacherData(v, dialog);
+                loadTeacherData(v);
             }
         });
     }
@@ -164,7 +190,7 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
         mServer.start();
     }
 
-    private void loadTeacherData(View v, Dialog dialog) {
+    private void loadTeacherData(View v) {
         String lastName = getTextFromEditTextById(R.id.last_name, v);
         String name = getTextFromEditTextById(R.id.name, v);
         String secondName = getTextFromEditTextById(R.id.second_name, v);
@@ -178,9 +204,17 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
 
         mServerInfo = new ServerInfo(lastName, name, secondName, subject);
 
-        dialog.dismiss();
+        StringBuffer buffer = new StringBuffer();
+        buffer.append(mServerInfo.name)
+                .append(" ")
+                .append(mServerInfo.secondName)
+                .append(" ")
+                .append(mServerInfo.lastName)
+                .append(" ")
+                .append(mServerInfo.subject);
 
-        setTeacherInfo();
+        mServerName = "serv" + StringUtil.md5(buffer.toString());
+        mNameChecker.isNameFree(mServerName);
     }
 
     private void setTeacherInfo() {
@@ -191,16 +225,6 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
         mTeacherInfoFragment.setSubject(mServerInfo.subject);
 
         mClientListFragment.setClients(mClientsInfo);
-
-        StringBuffer buffer = new StringBuffer();
-        buffer.append(mServerInfo.name)
-                .append(" ")
-                .append(mServerInfo.secondName)
-                .append(" ")
-                .append(mServerInfo.lastName)
-                .append(" ")
-                .append(mServerInfo.subject);
-        mServerName = "serv" + StringUtil.md5(buffer.toString());
         mServerInfo.serverId = mServerName;
 
         startServer();

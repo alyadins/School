@@ -96,8 +96,11 @@ public class Connection {
                     mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
                     while (!Thread.currentThread().isInterrupted()) {
                         String message = null;
+                        if (mSocket.isClosed()) {
+                            break;
+                        }
                         message = mReader.readLine();
-                        if (message != null) {
+                        if (message != null && !mSocket.isClosed()) {
                             if (message.equals("END")) {
                                 break;
                             }

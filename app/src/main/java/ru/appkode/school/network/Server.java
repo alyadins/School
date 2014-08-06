@@ -385,7 +385,7 @@ public class Server implements Connection.OnMessageReceivedListener, NsdManager.
      */
 
     public boolean isNameFree(String name) {
-    //    mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
+        mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
         return false;
     }
 

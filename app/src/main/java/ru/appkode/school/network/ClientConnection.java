@@ -312,7 +312,7 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
         return json.toString();
     }
 
-    public void setOnstatusChangedListener(OnStatusChanged l) {
+    public void setOnStatusChangedListener(OnStatusChanged l) {
         mOnStatusChanged = l;
     }
 
