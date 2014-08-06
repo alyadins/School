@@ -23,6 +23,7 @@ public class Connection {
     private PrintWriter mWriter;
     private BlockingQueue<String> mMessageQueue;
 
+    private Thread mConnectionThread;
     private Thread mSendingThread;
     private Thread mReceivingThread;
 
@@ -39,45 +40,49 @@ public class Connection {
     }
 
     public void start() throws IOException {
-        mSendingThread = new Thread(new SendingThread());
-        mReceivingThread = new Thread(new ReceivingThread());
-
-        mSendingThread.start();
-        mReceivingThread.start();
+        mConnectionThread = new Thread(new ConnectionThread());
+        mConnectionThread.start();
     }
-    class SendingThread implements Runnable {
+    class ConnectionThread implements Runnable {
 
         private int QUEUE_CAPACITY = 10;
-
-        SendingThread() {
+        ConnectionThread() {
             mMessageQueue = new ArrayBlockingQueue<String>(QUEUE_CAPACITY);
         }
 
         @Override
         public void run() {
+            if (mSocket == null) {
+                createSocket(mHost, mPort);
+            }
+            mSendingThread = new Thread(new SendingThread());
+            mReceivingThread = new Thread(new ReceivingThread());
+
+            mSendingThread.start();
+            mReceivingThread.start();
+        }
+    }
+    class SendingThread implements Runnable {
+
+        @Override
+        public void run() {
             try {
-                if (mSocket == null) {
-                    mSocket = new Socket(mHost, mPort);
-                }
-                mWriter = new PrintWriter(new BufferedWriter(new OutputStreamWriter(mSocket.getOutputStream())), true);
-                while (true) {
-                    try {
-                        String message = mMessageQueue.take();
-                        mWriter.println(message);
-                        mWriter.flush();
-                    } catch (InterruptedException ie) {
-                        ie.printStackTrace();
+                if (!mSocket.isClosed()) {
+                    mWriter = new PrintWriter(new BufferedWriter(new OutputStreamWriter(mSocket.getOutputStream())), true);
+                    while (true) {
+                        try {
+                            String message = mMessageQueue.take();
+                            mWriter.println(message);
+                            mWriter.flush();
+                        } catch (InterruptedException ie) {
+                            ie.printStackTrace();
+                        }
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                try {
-                    if (mSocket != null && !mSocket.isClosed())
-                        mSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                closeConnection();
             }
         }
     }
@@ -87,35 +92,39 @@ public class Connection {
         @Override
         public void run() {
             try {
-                if (mSocket == null) {
-                    mSocket = new Socket(mHost, mPort);
-                }
-                mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
-
-                while (!Thread.currentThread().isInterrupted()) {
-                    String message = null;
-                    message = mReader.readLine();
-                    if (message != null) {
-                        if (message.equals("END")) {
+                if (!mSocket.isClosed()) {
+                    mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
+                    while (!Thread.currentThread().isInterrupted()) {
+                        String message = null;
+                        if (mSocket.isClosed())
+                            break;
+                        message = mReader.readLine();
+                        if (message != null) {
+                            if (message.equals("END")) {
+                                break;
+                            }
+                            processMessage(message);
+                        } else {
                             break;
                         }
-                        processMessage(message);
-                    } else {
-                        break;
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                try {
-                    if (mSocket != null && !mSocket.isClosed())
-                        mSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+               closeConnection();
             }
 
         }
+    }
+
+    synchronized boolean createSocket(InetAddress host, int port) {
+        try {
+            mSocket = new Socket(host, port);
+        } catch (IOException e) {
+            return false;
+        }
+        return true;
     }
 
     public boolean isConnected() {
@@ -146,5 +155,15 @@ public class Connection {
 
     public void setOnMessageReceivedListener(OnMessageReceivedListener l) {
         mOnMessageReceivedListener = l;
+    }
+
+    public void closeConnection() {
+        if (mSocket != null && !mSocket.isClosed()) {
+            try {
+                mSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

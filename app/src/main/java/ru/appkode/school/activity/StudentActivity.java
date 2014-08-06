@@ -32,7 +32,7 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 /**
  * Created by lexer on 01.08.14.
  */
-public class StudentActivity extends Activity implements ClientConnection.OnTeacherListChanged, ServerListFragment.OnServerChosen, ClientConnection.OnStatusChanged {
+public class StudentActivity extends Activity implements ClientConnection.OnTeacherListChanged, ServerListFragment.OnServerAction, ClientConnection.OnStatusChanged {
 
     private ClientInfo mClientInfo;
 
@@ -44,6 +44,8 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
     private ClientConnection mClientConnection;
 
     private List<ServerInfo> mServersInfo;
+
+    private ServerInfo mCurrentServer;
 
     private ServerListFragment mServerListFragment;
 
@@ -76,7 +78,7 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
             mServerListFragment = (ServerListFragment) mFragmentManager.findFragmentByTag(ServerListFragment.TAG + "1");
             if (mServerListFragment == null) {
                 mServerListFragment = new ServerListFragment();
-                mServerListFragment.setOnServerChosenListener(this);
+                mServerListFragment.setOnServerActionListener(this);
                 mTabsFragment.setRightFragment(mServerListFragment, ServerListFragment.TAG + "1");
             }
             ServerListFragment slf2 = new ServerListFragment();
@@ -131,13 +133,20 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
     }
 
     @Override
-    public void onServerChosen(ServerInfo info) {
-        mClientConnection.connectToServer(info, mClientInfo);
+    public void onServerAction(ServerInfo info, int action) {
+        switch (action) {
+            case ServerListFragment.CONNECT:
+                if (mClientInfo.connection == null)
+                    mClientConnection.disconnectFromServer(mClientInfo);
+                mClientConnection.connectToServer(info, mClientInfo);
+                break;
+            case ServerListFragment.DISCONNECT:
+                mClientConnection.disconnectFromServer(mClientInfo);
+        }
     }
 
     @Override
     public void onTeacherListChanged(ClientConnection connection, List<ServerInfo> serversInfo) {
-        Log.d("TEST", "on teacher list changed");
         mServersInfo = serversInfo;
         runOnUiThread(new Runnable() {
             @Override
@@ -190,27 +199,51 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
     }
 
     @Override
-    public void OnStatusChanged(final int status) {
+    public void OnStatusChanged(final int status, final String serverId) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                ServerInfo info;
                 switch (status) {
                     case Server.BLOCK_CODE:
                         mClientInfo.isBlocked = true;
                         mStudentInfoFragment.setBlock(true);
+                        mClientInfo.blockedBy = serverId;
                         break;
                     case Server.UNBLOCK_CODE:
                         mClientInfo.isBlocked = false;
                         mStudentInfoFragment.setBlock(false);
+                        break;
+                    case Server.CONNECTED:
+                        info = getServerInfoById(serverId);
+                        if (info != null) {
+                            info.isConnected = true;
+                        }
+                        mCurrentServer = info;
+                        mServerListFragment.setServerList(mServersInfo);
+                        break;
+                    case Server.DISCONNECT:
+                        info = getServerInfoById(serverId);
+                        info.isConnected = false;
+                        break;
                 }
             }
         });
+    }
+
+    private ServerInfo getServerInfoById(String serverId) {
+        for (ServerInfo info : mServersInfo) {
+            if (info.serverId.equals(serverId))
+                return info;
+        }
+
+        return null;
     }
 
     private void setUserInfo() {
 
         mStudentInfoFragment.setUserName(mClientInfo.name + " " + mClientInfo.lastName);
         mStudentInfoFragment.setGroup(mClientInfo.group);
-        mStudentInfoFragment.setBlock(true);
+        mStudentInfoFragment.setBlock(mClientInfo.isBlocked);
     }
 }

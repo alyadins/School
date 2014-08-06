@@ -6,7 +6,6 @@ import android.app.Dialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -17,7 +16,7 @@ import java.util.List;
 
 import ru.appkode.school.R;
 import ru.appkode.school.data.ClientInfo;
-import ru.appkode.school.data.TeacherInfo;
+import ru.appkode.school.data.ServerInfo;
 import ru.appkode.school.fragment.ClientListFragment;
 import ru.appkode.school.fragment.TeacherInfoFragment;
 import ru.appkode.school.network.Server;
@@ -33,7 +32,7 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
  */
 public class TeacherActivity extends Activity implements Server.OnClientListChanged, OnUserActionPerform {
 
-    private TeacherInfo mTeacherInfo;
+    private ServerInfo mServerInfo;
 
     private FragmentManager mFragmentManager;
     private TeacherInfoFragment mTeacherInfoFragment;
@@ -84,13 +83,7 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
     protected void onPause() {
         super.onPause();
         if (mServer != null)
-            mServer.unregisterService();
-    }
-
-    @Override
-    protected void onDestroy() {
-        mServer.stop();
-        super.onDestroy();
+            mServer.stop();
     }
 
     @Override
@@ -164,7 +157,7 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
     private void startServer() {
         if (mServer == null) {
             mServer = new Server(this, mServerName);
-            mServer.setTeacherInfo(mTeacherInfo);
+            mServer.setServerInfo(mServerInfo);
             mServer.setOnNewUserConnectedListener(this);
         }
         mServer.start();
@@ -182,7 +175,7 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
                 checkForEmpty(this, subject, R.string.error_enter_subject))
             return;
 
-        mTeacherInfo = new TeacherInfo(lastName, name, secondName, subject);
+        mServerInfo = new ServerInfo(lastName, name, secondName, subject);
 
         dialog.dismiss();
 
@@ -190,23 +183,24 @@ public class TeacherActivity extends Activity implements Server.OnClientListChan
     }
 
     private void setTeacherInfo() {
-        mTeacherInfoFragment.setName(mTeacherInfo.name,
-                mTeacherInfo.secondName,
-                mTeacherInfo.lastName);
+        mTeacherInfoFragment.setName(mServerInfo.name,
+                mServerInfo.secondName,
+                mServerInfo.lastName);
 
-        mTeacherInfoFragment.setSubject(mTeacherInfo.subject);
+        mTeacherInfoFragment.setSubject(mServerInfo.subject);
 
         mClientListFragment.setClients(mClientsInfo);
 
         StringBuffer buffer = new StringBuffer();
-        buffer.append(mTeacherInfo.name)
+        buffer.append(mServerInfo.name)
                 .append(" ")
-                .append(mTeacherInfo.secondName)
+                .append(mServerInfo.secondName)
                 .append(" ")
-                .append(mTeacherInfo.lastName)
+                .append(mServerInfo.lastName)
                 .append(" ")
-                .append(mTeacherInfo.subject);
+                .append(mServerInfo.subject);
         mServerName = "serv" + StringUtil.md5(buffer.toString());
+        mServerInfo.serverId = mServerName;
 
         startServer();
     }

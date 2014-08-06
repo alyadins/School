@@ -1,11 +1,11 @@
 package ru.appkode.school.gui;
 
 import android.content.Context;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -14,7 +14,6 @@ import java.util.List;
 
 import ru.appkode.school.R;
 import ru.appkode.school.data.ServerInfo;
-import ru.appkode.school.data.TeacherInfo;
 
 /**
  * Created by lexer on 01.08.14.
@@ -24,6 +23,8 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
 
     private List<ServerInfo> mServers;
     private int mResId;
+
+    private OnClientStateChanged mOnClientStateChanged;
 
     public ServerListAdapter(Context context, int resource, List<ServerInfo> servers) {
         super(context, resource, servers);
@@ -50,14 +51,24 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
             holder = (ViewHolder) v.getTag();
         }
 
-        ServerInfo server = mServers.get(position);
-        TeacherInfo info = server.teacherInfo;
+        final ServerInfo info = mServers.get(position);
 
         String fullTeacherName = info.name + " " + info.secondName + " " + " " + info.lastName + " ";
 
         holder.name.setText(fullTeacherName);
         holder.subject.setText(info.subject);
-        holder.isConnected.setChecked(server.isConnected);
+        holder.isConnected.setChecked(info.isConnected);
+        holder.isConnected.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (mOnClientStateChanged != null)
+                    if (isChecked) {
+                        mOnClientStateChanged.onClientConnect(info);
+                    } else {
+                        mOnClientStateChanged.onClientDisconnect(info);
+                    }
+            }
+        });
 
         return v;
     }
@@ -75,6 +86,14 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
         TextView name;
         TextView subject;
         Switch isConnected;
+    }
+
+    public void setOnClientStateChangeListener(OnClientStateChanged l) {
+        mOnClientStateChanged = l;
+    }
+    public interface OnClientStateChanged {
+        public void onClientDisconnect(ServerInfo info);
+        public void onClientConnect(ServerInfo info);
     }
 
 }

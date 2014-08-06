@@ -14,7 +14,8 @@ public class ClientInfo {
     public String group;
 
     public boolean isBlockedByOther = false;
-    public boolean isBlocked;
+    public String blockedBy = "none";
+    public boolean isBlocked = false;
     public boolean isChosen = false;
 
     public Connection connection;

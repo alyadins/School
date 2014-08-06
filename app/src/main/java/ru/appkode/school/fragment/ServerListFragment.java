@@ -1,16 +1,13 @@
 package ru.appkode.school.fragment;
 
-import android.app.Fragment;
 import android.app.ListFragment;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import ru.appkode.school.R;
 import ru.appkode.school.data.ServerInfo;
@@ -19,15 +16,17 @@ import ru.appkode.school.gui.ServerListAdapter;
 /**
  * Created by lexer on 01.08.14.
  */
-public class ServerListFragment extends ListFragment implements AdapterView.OnItemClickListener {
+public class ServerListFragment extends ListFragment implements  ServerListAdapter.OnClientStateChanged {
 
     public static final String TAG = "ServerListFragment";
+    public static final int CONNECT = 0;
+    public static final int DISCONNECT = 1;
 
     private List<ServerInfo> mServerList;
 
     private ServerListAdapter mAdapter;
 
-    private OnServerChosen mOnServerChosen;
+    private OnServerAction mOnServerAction;
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
@@ -35,7 +34,6 @@ public class ServerListFragment extends ListFragment implements AdapterView.OnIt
         mServerList = new ArrayList<ServerInfo>();
 
         setServerList(mServerList);
-        getListView().setOnItemClickListener(this);
     }
 
     public void setServerList(List<ServerInfo> serverList) {
@@ -43,6 +41,7 @@ public class ServerListFragment extends ListFragment implements AdapterView.OnIt
         if (serverList != null) {
             if (mAdapter == null) {
                 mAdapter = new ServerListAdapter(getActivity(), R.layout.server_list_item, mServerList);
+                mAdapter.setOnClientStateChangeListener(this);
                 setListAdapter(mAdapter);
             } else {
                 mAdapter.setData(serverList);
@@ -51,17 +50,25 @@ public class ServerListFragment extends ListFragment implements AdapterView.OnIt
     }
 
     @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        if (mOnServerChosen != null) {
-            mOnServerChosen.onServerChosen(mServerList.get(position));
+    public void onClientDisconnect(ServerInfo info) {
+        if (mOnServerAction != null) {
+            mOnServerAction.onServerAction(info, DISCONNECT);
         }
     }
 
-    public void setOnServerChosenListener(OnServerChosen l) {
-        mOnServerChosen = l;
+    @Override
+    public void onClientConnect(ServerInfo info) {
+        Log.d("TEST", "connect");
+        if (mOnServerAction != null) {
+            mOnServerAction.onServerAction(info, CONNECT);
+        }
     }
 
-    public interface OnServerChosen {
-        public void onServerChosen(ServerInfo info);
+    public void setOnServerActionListener(OnServerAction l) {
+        mOnServerAction = l;
+    }
+
+    public interface OnServerAction {
+        public void onServerAction(ServerInfo info, int action);
     }
 }

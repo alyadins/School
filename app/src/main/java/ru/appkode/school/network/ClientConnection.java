@@ -15,7 +15,6 @@ import java.util.List;
 
 import ru.appkode.school.data.ClientInfo;
 import ru.appkode.school.data.ServerInfo;
-import ru.appkode.school.data.TeacherInfo;
 
 
 /**
@@ -30,6 +29,8 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
     private Context mContext;
     private NsdManager mNsdManager;
     private List<ServerInfo> mServersInfo;
+
+    private String mServerId;
 
     private boolean mIsDiscoveryStarted = false;
 
@@ -108,7 +109,7 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
         String serviceName = serviceInfo.getServiceName();
         if (serviceName.substring(0, 4).equals("serv")
                 && !isServiceAdded(serviceInfo)) {
-            askForTeacherInfo(serviceInfo);
+            askForServerInfo(serviceInfo);
         } else {
         }
     }
@@ -144,8 +145,8 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
         return compareServicesInfo(s1.serviceInfo, s2.serviceInfo);
     }
 
-    private TeacherInfo askForTeacherInfo(final NsdServiceInfo serviceInfo) {
-        final TeacherInfo info = new TeacherInfo();
+    private ServerInfo askForServerInfo(final NsdServiceInfo serviceInfo) {
+        final ServerInfo info = new ServerInfo();
         try {
             Connection connection = new Connection(new Socket(serviceInfo.getHost(), serviceInfo.getPort()));
             connection.setOnMessageReceivedListener(new Connection.OnMessageReceivedListener() {
@@ -154,6 +155,8 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
                     if (parseCode(message) == Server.INFO) {
                         addService(serviceInfo, parseTeacherInfoJson(message));
                         connection.sendMessage("END");
+                    } else {
+                        Log.e(TAG, "server error");
                     }
                 }
             });
@@ -177,28 +180,35 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
         return code;
     }
 
-    private void addService(NsdServiceInfo serviceInfo, TeacherInfo teacherInfo) {
-        ServerInfo info = new ServerInfo();
-        info.serviceInfo = serviceInfo;
-        info.teacherInfo = teacherInfo;
-        mServersInfo.add(info);
+    private void addService(NsdServiceInfo serviceInfo, ServerInfo serverInfo) {
+        serverInfo.serviceInfo = serviceInfo;
+        mServersInfo.add(serverInfo);
 
         if (mOnTeacherListChanged != null) {
             mOnTeacherListChanged.onTeacherListChanged(this, mServersInfo);
         }
     }
 
-    private TeacherInfo parseTeacherInfoJson(String message) {
+    private ServerInfo parseTeacherInfoJson(String message) {
         try {
             JSONObject object = new JSONObject(message);
             String name = object.getString("name");
             String secondName = object.getString("second_name");
             String lastName = object.getString("last_name");
             String subject = object.getString("subject");
-            return  new TeacherInfo(lastName, name, secondName, subject);
+            String serverId = object.getString("server_id");
+            ServerInfo info = new ServerInfo();
+            info.serverId = serverId;
+            info.subject = subject;
+            info.lastName = lastName;
+            info.secondName = secondName;
+            info.name = name;
+            return info;
         } catch (JSONException e) {
             e.printStackTrace();
         }
+
+
 
         return null;
     }
@@ -220,36 +230,50 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
     }
 
     public void disconnectFromServer(ClientInfo clientInfo) {
-        if (!mConnection.isConnected()) {
+        if (mConnection != null) {
             try {
                 mConnection.start();
                 mConnection.setOnMessageReceivedListener(this);
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            mConnection.sendMessage(getDisconnectJson(clientInfo));
         }
-        mConnection.sendMessage(getDisconnectJson(clientInfo));
     }
 
     @Override
     public void onReceiveMessage(Connection connection, String message) {
-        Log.d("TEST", message);
         int code =  parseCode(message);
+        Log.d("TEST", message);
         //200
-        switch (code) {
-            case Server.CONNECTED:
-                Log.d(TAG, "connected");
-                break;
-            case Server.DISCONNECTED:
-                Log.d(TAG, "disconnected");
-                break;
-        }
-        if (code / 100 == 5) {
-            mOnStatusChanged.OnStatusChanged(code);
+        if (mOnStatusChanged != null) {
+            switch (code) {
+                case Server.CONNECTED:
+                    mServerId = getServerIdFromJson(message);
+                    mOnStatusChanged.OnStatusChanged(code, mServerId);
+                    break;
+                case Server.DISCONNECTED:
+                    mConnection.closeConnection();
+                    break;
+            }
+            if (code / 100 == 5) {
+                mOnStatusChanged.OnStatusChanged(code, mServerId);
+            }
         }
         if (code / 100 == 4) {
             Log.e(TAG, "server error");
         }
+    }
+
+    private String getServerIdFromJson(String message) {
+        String id = "";
+        try {
+            JSONObject json = new JSONObject(message);
+            id = json.getString("server_id");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return id;
     }
 
 
@@ -262,6 +286,7 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
             json.put("group", info.group);
             json.put("id", info.clientId);
             json.put("block", info.isBlocked);
+            json.put("block_by", info.blockedBy);
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -298,7 +323,7 @@ public class ClientConnection implements NsdManager.ResolveListener, NsdManager.
     }
 
     public interface OnStatusChanged {
-        public void OnStatusChanged(int status);
+        public void OnStatusChanged(int status, String serverId);
     }
 
     public void setOnTeacherListChangedListener(OnTeacherListChanged l) {

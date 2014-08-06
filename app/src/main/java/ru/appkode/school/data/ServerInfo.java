@@ -8,21 +8,24 @@ import ru.appkode.school.util.StringUtil;
  * Created by lexer on 01.08.14.
  */
 public class ServerInfo {
-    public String name;
     public String subject;
     public boolean isFavourite;
     public boolean isConnected;
+    public String lastName;
+    public String name;
+    public String secondName;
 
-    public TeacherInfo teacherInfo;
+    public String serverId;
+
     public NsdServiceInfo serviceInfo;
 
     public ServerInfo() {
     }
 
-    public ServerInfo(String name, String subject, boolean isFavourite, boolean isConnected) {
+    public ServerInfo(String lastName, String name, String secondName, String subject) {
+        this.lastName = lastName;
         this.name = name;
+        this.secondName = secondName;
         this.subject = subject;
-        this.isFavourite = isFavourite;
-        this.isConnected = isConnected;
     }
 }
