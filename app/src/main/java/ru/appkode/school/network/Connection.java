@@ -1,5 +1,7 @@
 package ru.appkode.school.network;
 
+import org.json.JSONException;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -15,6 +17,14 @@ import java.util.concurrent.BlockingQueue;
  * Created by lexer on 04.08.14.
  */
 public class Connection {
+
+    interface OnMessageReceivedListener {
+        public void onReceiveMessage(Connection connection, String message) throws JSONException;
+    }
+
+    public void setOnMessageReceivedListener(OnMessageReceivedListener l) {
+        mOnMessageReceivedListener = l;
+    }
 
     private Socket mSocket = null;
     private InetAddress mHost;
@@ -67,7 +77,7 @@ public class Connection {
         @Override
         public void run() {
             try {
-                if (!mSocket.isClosed()) {
+                if (mSocket != null && !mSocket.isClosed()) {
                     mWriter = new PrintWriter(new BufferedWriter(new OutputStreamWriter(mSocket.getOutputStream())), true);
                     while (true) {
                         try {
@@ -92,7 +102,7 @@ public class Connection {
         @Override
         public void run() {
             try {
-                if (!mSocket.isClosed()) {
+                if (mSocket != null && !mSocket.isClosed()) {
                     mReader = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
                     while (!Thread.currentThread().isInterrupted()) {
                         String message = null;
@@ -143,18 +153,14 @@ public class Connection {
 
     private void processMessage(String message) {
        if (mOnMessageReceivedListener != null) {
-           mOnMessageReceivedListener.onReceiveMessage(this, message);
+           try {
+               mOnMessageReceivedListener.onReceiveMessage(this, message);
+           } catch (JSONException e) {
+               e.printStackTrace();
+           }
        } else {
            throw new NullPointerException("set OnMessageReceivedListener");
        }
-    }
-
-    interface OnMessageReceivedListener {
-        public void onReceiveMessage(Connection connection, String message);
-    }
-
-    public void setOnMessageReceivedListener(OnMessageReceivedListener l) {
-        mOnMessageReceivedListener = l;
     }
 
     public void closeConnection() {

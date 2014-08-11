@@ -12,10 +12,10 @@ import java.util.List;
 /**
  * Created by lexer on 06.08.14.
  */
-public class ServerNameChecker implements NsdManager.DiscoveryListener, NsdManager.ResolveListener {
+public class NameChecker implements NsdManager.DiscoveryListener {
 
     public static final String SERVICE_TYPE = "_http._tcp.";
-    public static final int DELAY = 3000;
+    public static final int DELAY = 1000;
 
     private Context mContext;
     private NsdManager mNsdManager;
@@ -25,7 +25,7 @@ public class ServerNameChecker implements NsdManager.DiscoveryListener, NsdManag
 
     private String mNameForCheck;
 
-    public ServerNameChecker(Context context) {
+    public NameChecker(Context context) {
         this.mContext = context;
         mNsdManager = (NsdManager) mContext.getSystemService(Context.NSD_SERVICE);
         mRegisteredNames = new ArrayList<String>();
@@ -43,31 +43,20 @@ public class ServerNameChecker implements NsdManager.DiscoveryListener, NsdManag
 
     @Override
     public void onDiscoveryStarted(String serviceType) {
-        Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                stopDiscover();
-            }
-        }, DELAY);
+        mRegisteredNames.clear();
     }
 
     @Override
     public void onDiscoveryStopped(String serviceType) {
-        Log.d("TEST", "check = " + mNameForCheck);
-        for (String n : mRegisteredNames) {
-            Log.d("TEST", n);
-        }
-        if (mNameChecked != null) {
-            mNameChecked.onNameChecked(!isServerAdded(mNameForCheck));
-        }
     }
 
     @Override
     public void onServiceFound(NsdServiceInfo serviceInfo) {
-        mNsdManager.resolveService(serviceInfo, this);
+        String name = serviceInfo.getServiceName();
+        if (!isServerAdded(name)) {
+            mRegisteredNames.add(name);
+        }
     }
-
 
     @Override
     public void onServiceLost(NsdServiceInfo serviceInfo) {
@@ -77,35 +66,31 @@ public class ServerNameChecker implements NsdManager.DiscoveryListener, NsdManag
         }
     }
 
-    @Override
-    public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-
-    }
-
-    @Override
-    public void onServiceResolved(NsdServiceInfo serviceInfo) {
-        String name = serviceInfo.getServiceName();
-        if (!isServerAdded(name)) {
-            mRegisteredNames.add(name);
-        }
-    }
 
     public void isNameFree(String name) {
         mNameForCheck = name;
-        startDiscover();
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (mNameChecked != null) {
+                    mNameChecked.onNameChecked(!isServerAdded(mNameForCheck));
+                }
+            }
+        }, DELAY);
     }
 
-    private void startDiscover() {
+    public void startDiscover() {
         mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
     }
 
-    private void stopDiscover() {
+    public void stopDiscover() {
         mNsdManager.stopServiceDiscovery(this);
     }
 
     private boolean isServerAdded(String name) {
         for (String n : mRegisteredNames) {
-            Log.d("TEST", n);
+            Log.d("TEST", "name = " + name);
             if (n.equals(name))
                 return true;
         }
@@ -114,10 +99,12 @@ public class ServerNameChecker implements NsdManager.DiscoveryListener, NsdManag
     }
 
     private void deleteServer(String name) {
+        String nameForRemove = "";
         for (String n : mRegisteredNames) {
             if (n.equals(name))
-                mRegisteredNames.remove(n);
+                nameForRemove = n;
         }
+        mRegisteredNames.remove(nameForRemove);
     }
 
     public void setNameCheckedListener(NameChecked l) {

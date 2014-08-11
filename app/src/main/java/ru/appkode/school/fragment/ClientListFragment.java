@@ -2,7 +2,6 @@ package ru.appkode.school.fragment;
 
 import android.app.Fragment;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,10 +12,8 @@ import android.widget.ListView;
 import java.util.List;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.ClientInfo;
-import ru.appkode.school.data.ServerInfo;
+import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.gui.ClientListAdapter;
-import ru.appkode.school.gui.ServerListAdapter;
 
 /**
  * Created by lexer on 02.08.14.
@@ -33,7 +30,7 @@ public class ClientListFragment extends Fragment implements View.OnClickListener
 
     private ClientListAdapter mAdapter;
 
-    private List<ClientInfo> mClientsInfo;
+    private List<ParcelableClientInfo> mClientsInfo;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -50,6 +47,10 @@ public class ClientListFragment extends Fragment implements View.OnClickListener
         return v;
     }
 
+    public List<ParcelableClientInfo> getClientsInfo() {
+        return mClientsInfo;
+    }
+
     @Override
     public void onClick(View v) {
         int id = v.getId();
@@ -61,14 +62,14 @@ public class ClientListFragment extends Fragment implements View.OnClickListener
     @Override
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
         if (buttonView == mSelectAllCheckBox) {
-            for (ClientInfo info : mClientsInfo) {
+            for (ParcelableClientInfo info : mClientsInfo) {
                 info.isChosen = isChecked;
                 mAdapter.setClientsList(mClientsInfo);
             }
         }
     }
 
-    public void setClients(List<ClientInfo> clientsInfo) {
+    public void setClients(List<ParcelableClientInfo> clientsInfo) {
         mClientsInfo = clientsInfo;
 
         if (mClientsInfo != null) {
@@ -76,7 +77,7 @@ public class ClientListFragment extends Fragment implements View.OnClickListener
                 mAdapter = new ClientListAdapter(getActivity(), R.layout.fragment_client_list_item, mClientsInfo);
                 mClientListView.setAdapter(mAdapter);
             } else {
-                mAdapter.setClientsList(clientsInfo);
+                mAdapter.setClientsList(mClientsInfo);
             }
         }
     }

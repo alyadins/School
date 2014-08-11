@@ -1,6 +1,7 @@
 package ru.appkode.school.gui;
 
 import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,20 +14,20 @@ import android.widget.TextView;
 import java.util.List;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.ServerInfo;
+import ru.appkode.school.data.ParcelableServerInfo;
 
 /**
  * Created by lexer on 01.08.14.
  */
-public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
+public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
 
 
-    private List<ServerInfo> mServers;
+    private List<ParcelableServerInfo> mServers;
     private int mResId;
 
     private OnClientStateChanged mOnClientStateChanged;
 
-    public ServerListAdapter(Context context, int resource, List<ServerInfo> servers) {
+    public ServerListAdapter(Context context, int resource, List<ParcelableServerInfo> servers) {
         super(context, resource, servers);
         mServers = servers;
         this.mResId = resource;
@@ -51,13 +52,15 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
             holder = (ViewHolder) v.getTag();
         }
 
-        final ServerInfo info = mServers.get(position);
+        final ParcelableServerInfo info = mServers.get(position);
 
         String fullTeacherName = info.name + " " + info.secondName + " " + " " + info.lastName + " ";
 
         holder.name.setText(fullTeacherName);
         holder.subject.setText(info.subject);
+        holder.isConnected.setOnCheckedChangeListener(null);
         holder.isConnected.setChecked(info.isConnected);
+        Log.d("TEST", "setChecked for " + fullTeacherName + "  " + info.isConnected);
         holder.isConnected.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -69,12 +72,11 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
                     }
             }
         });
-
         return v;
     }
 
 
-    public void setData(List<ServerInfo> serverList) {
+    public void setData(List<ParcelableServerInfo> serverList) {
         mServers.clear();
         mServers.addAll(serverList);
         notifyDataSetChanged();
@@ -92,8 +94,8 @@ public class ServerListAdapter extends ArrayAdapter<ServerInfo> {
         mOnClientStateChanged = l;
     }
     public interface OnClientStateChanged {
-        public void onClientDisconnect(ServerInfo info);
-        public void onClientConnect(ServerInfo info);
+        public void onClientDisconnect(ParcelableServerInfo info);
+        public void onClientConnect(ParcelableServerInfo info);
     }
 
 }

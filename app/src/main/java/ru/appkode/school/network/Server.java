@@ -1,12 +1,8 @@
 package ru.appkode.school.network;
 
-import android.content.Context;
-import android.net.nsd.NsdManager;
-import android.net.nsd.NsdServiceInfo;
 import android.util.Log;
 
 import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -14,17 +10,21 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-import ru.appkode.school.data.ClientInfo;
-import ru.appkode.school.data.ServerInfo;
+import ru.appkode.school.data.ClientConnectionData;
+import ru.appkode.school.data.ParcelableClientInfo;
+import ru.appkode.school.data.ParcelableServerInfo;
+import ru.appkode.school.util.JSONHelper;
 
 /**
  * Created by lexer on 01.08.14.
  */
-public class Server implements Connection.OnMessageReceivedListener, NsdManager.RegistrationListener, NsdManager.ResolveListener, NsdManager.DiscoveryListener {
+public class Server implements Connection.OnMessageReceivedListener{
+
 
     public static final String SERVICE_TYPE = "_http._tcp.";
 
-    public static final int INFO = 200;
+
+    public static final int INFO_CODE = 200;
     public static final int CONNECTED = 201;
     public static final int DISCONNECTED = 202;
 
@@ -35,101 +35,192 @@ public class Server implements Connection.OnMessageReceivedListener, NsdManager.
     public static final int BLOCK_CODE = 500;
     public static final int UNBLOCK_CODE = 501;
     public static final int DELETE_CODE = 502;
-    public static final int DISCONNECT = 503;
 
+    public static final int INFO = 0;
+    public static final int CONNECT = 1;
+    public static final int DISCONNECT = 2;
 
-    private Context mContext;
+    /*
+        Interfaces
+     */
+
+    public void setOnClientListChangedListener(OnClientListChanged l) {
+        mOnClientListChanged = l;
+    }
+
+    public interface OnClientListChanged {
+        public void onClientListChanged(ArrayList<ParcelableClientInfo> clientsInfo);
+    }
+
     //Network
     private ServerSocket mServerSocket = null;
     private int mPort = -1;
-    private NsdManager mNsdManager;
 
     //Data
-    private String mServerName;
-    private List<ClientInfo> mClientsInfo;
-    private ServerInfo mServerInfo;
+    private String mServerId;
+    private ArrayList<ParcelableClientInfo> mClientsInfo;
+    private List<ClientConnectionData> mClientConnections;
+    private ParcelableServerInfo mServerInfo;
 
     //Listeners
     private OnClientListChanged mOnClientListChanged;
-    private OnCheckName mOnCheckName;
 
-    private boolean mIsRegistered;
+    private Thread mServerThread;
 
-    public Server(Context context, String serverName) {
-        mServerName = serverName;
-        mContext = context;
-        mClientsInfo = new ArrayList<ClientInfo>();
-        mNsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
+    public Server() {
+        mClientsInfo = new ArrayList<ParcelableClientInfo>();
+        mClientConnections = new ArrayList<ClientConnectionData>();
     }
 
-    class ServerThread implements Runnable {
+    public void setServerInfo(ParcelableServerInfo info) {
+        mServerInfo = info;
+        mServerId = info.serverId;
+    }
 
-        @Override
-        public void run() {
+    public int getPort() {
+        return mPort;
+    }
+
+    /*
+       Block unblock
+    */
+    public void block(List<ParcelableClientInfo> selectedClients){
+        for (ParcelableClientInfo info : selectedClients) {
+            ClientConnectionData data = getConnectionDataById(info.clientId);
             try {
-                mServerSocket = new ServerSocket(0);
-                mPort = mServerSocket.getLocalPort();
-                registerService(mPort);
-
-                while (!Thread.currentThread().isInterrupted()) {
-                    Socket socket = mServerSocket.accept();
-                    startConnection(socket);
-                }
-
-            } catch (IOException e) {
+                data.connection.sendMessage(JSONHelper.createSimpleAnswer(BLOCK_CODE, "block"));
+            } catch (JSONException e) {
                 e.printStackTrace();
-            } finally {
-                try {
-                    mServerSocket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
             }
         }
     }
 
+    public void unBlock(List<ParcelableClientInfo> selectedClients) {
+        for (ParcelableClientInfo info : selectedClients) {
+            ClientConnectionData data = getConnectionDataById(info.clientId);
+            ParcelableClientInfo parcelableClientInfo = getClientsInfoById(info.clientId);
+            parcelableClientInfo.isBlockedByOther = false;
+            parcelableClientInfo.isChosen = true;
+            try {
+                data.connection.sendMessage(JSONHelper.createSimpleAnswer(UNBLOCK_CODE, "unblock"));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+        if (mOnClientListChanged != null) {
+            mOnClientListChanged.onClientListChanged(mClientsInfo);
+        }
+    }
+    public ArrayList<ParcelableClientInfo> getClientsInfo() {
+        return mClientsInfo;
+    }
 
-    public void setServerInfo(ServerInfo info) {
-        mServerInfo = info;
+    public void disconnectAllClients() {
+        disconnect(mClientsInfo);
+    }
+
+    public void disconnect(List<ParcelableClientInfo> infoList) {
+        for (ParcelableClientInfo info : infoList) {
+            ClientConnectionData data = getConnectionDataById(info.clientId);
+            ParcelableClientInfo infoForDelete = getClientsInfoById(info.clientId);
+            try {
+                data.connection.sendMessage(JSONHelper.createServerDisconnect(mServerId));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            mClientsInfo.remove(infoForDelete);
+            data.connection.closeConnection();
+            mClientConnections.remove(data);
+        }
+        if (mOnClientListChanged != null)
+            mOnClientListChanged.onClientListChanged(mClientsInfo);
+    }
+
+    public ParcelableClientInfo getClientsInfoById(String clientId) {
+        for (ParcelableClientInfo info : mClientsInfo) {
+            if (info.clientId.equals(clientId)) {
+                return info;
+            }
+        }
+
+        return null;
+    }
+
+     /*
+        Start stop
+     */
+
+    public void start() {
+        mServerThread = new Thread(new ServerThread());
+        mServerThread.start();
+        Log.d("TEST", "server started");
+    }
+
+    public void stop() {
+        disconnectAllClients();
     }
 
     @Override
     public void onReceiveMessage(Connection connection, String message) {
-        processMessage(connection, message);
-    }
-
-    private void processMessage(Connection connection, String message) {
-
-        String method = parseMethodFromJson(message);
-        if (method.equals("info")) {
-            connection.sendMessage(getTeacherInfoJson());
-        } else if (method.equals("connect")) {
-            ClientInfo info = parseUserInfoJson(message);
-            if (isClientConnected(info)) {
-                connection.sendMessage(createSimpleAnswerJson(ALREADY_CONNECTED, "already connected"));
-            } else {
-                info.connection = connection;
-                mClientsInfo.add(info);
-                if (mOnClientListChanged != null) {
-                    mOnClientListChanged.onClientListChanged(mClientsInfo);
-                }
-                connection.sendMessage(createConnectionMessage(CONNECTED, "connected"));
-            }
-        } else if (method.equals("disconnect")) {
-            String clientId = parseClientIdFromJson(message);
-            if (removeClient(clientId)) {
-                connection.sendMessage(createConnectionMessage(DISCONNECTED, "disconnected"));
-                connection.closeConnection();
-                removeClient(parseClientIdFromJson(message));
-            }
-        } else {
-            connection.sendMessage(createSimpleAnswerJson(COMMAND_NOT_FOUND, "command not found"));
+        try {
+            processMessage(connection, message);
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 
-    private boolean isClientConnected(ClientInfo info) {
-        for (ClientInfo i : mClientsInfo) {
-            if (info.clientId.equals(i.clientId))
+    private void processMessage(Connection connection, String message) throws JSONException {
+        Log.d("TEST", message);
+        int method = JSONHelper.parseMethod(message);
+        switch (method) {
+            case INFO_CODE:
+                processInfo(connection);
+                break;
+            case CONNECT:
+                processConnect(connection, message);
+                break;
+            case DISCONNECT:
+                processConnect(connection, message);
+                break;
+            default:
+                connection.sendMessage(JSONHelper.createSimpleAnswer(COMMAND_NOT_FOUND, "command not found"));
+        }
+    }
+
+    private void processInfo(Connection connection) throws JSONException {
+        connection.sendMessage(JSONHelper.createServerInfo(mServerInfo));
+    }
+
+    private void processConnect(Connection connection, String message) throws JSONException {
+        ParcelableClientInfo info = JSONHelper.parseUserInfo(message, mServerId);
+
+        if (isClientConnected(info.clientId)) {
+            connection.sendMessage(JSONHelper.createSimpleAnswer(ALREADY_CONNECTED, "already connected"));
+        } else {
+            ClientConnectionData data = new ClientConnectionData();
+            data.clientId = info.clientId;
+            data.connection = connection;
+            mClientsInfo.add(info);
+            mClientConnections.add(data);
+            if (mOnClientListChanged != null) {
+                mOnClientListChanged.onClientListChanged(mClientsInfo);
+            }
+            connection.sendMessage(JSONHelper.createConnectionMessage(CONNECTED, "connected", mServerId));
+        }
+    }
+
+    private void processDisconnect(Connection connection, String message) throws JSONException {
+        String clientId = JSONHelper.parseClientId(message);
+        if (removeClient(clientId)) {
+            connection.sendMessage(JSONHelper.createConnectionMessage(DISCONNECTED, "disconnected", mServerId));
+            connection.closeConnection();
+            removeClient(JSONHelper.parseClientId(message));
+        }
+    }
+
+    private boolean isClientConnected(String clientId) {
+        for (ClientConnectionData connection : mClientConnections) {
+            if (connection.clientId.equals(clientId))
                 return true;
         }
 
@@ -146,23 +237,21 @@ public class Server implements Connection.OnMessageReceivedListener, NsdManager.
         }
     }
 
-    public void disconnectAllClients() {
-        disconnect(mClientsInfo);
-    }
-    public void disconnect(List<ClientInfo> infoList) {
-        for (ClientInfo info : infoList) {
-            info.connection.sendMessage(getDisconnectJson());
-            mClientsInfo.remove(info);
-            info.connection.closeConnection();
+
+
+    private ClientConnectionData getConnectionDataById(String clientId) {
+        for (ClientConnectionData data : mClientConnections) {
+            if (data.clientId.equals(clientId))
+                return data;
         }
-        if (mOnClientListChanged != null)
-            mOnClientListChanged.onClientListChanged(mClientsInfo);
+        return null;
     }
 
     private boolean removeClient(String clientId) {
-        for (ClientInfo info : mClientsInfo) {
+        for (ParcelableClientInfo info : mClientsInfo) {
             if (info.clientId.equals(clientId)) {
                 mClientsInfo.remove(info);
+                mClientConnections.remove(getConnectionDataById(info.clientId));
                 if(mOnClientListChanged != null) {
                     mOnClientListChanged.onClientListChanged(mClientsInfo);
                 }
@@ -172,266 +261,28 @@ public class Server implements Connection.OnMessageReceivedListener, NsdManager.
         return false;
     }
 
-    /*
-        Json
-     */
 
-    private String createConnectionMessage(int code, String message) {
-        JSONObject json = new JSONObject();
-        try {
-            json.put("code", code);
-            json.put("message", message);
-            json.put("server_id", mServerName);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+    class ServerThread implements Runnable {
 
-        return json.toString();
-    }
+        @Override
+        public void run() {
+            try {
+                mServerSocket = new ServerSocket(0);
+                mPort = mServerSocket.getLocalPort();
+                while (!Thread.currentThread().isInterrupted()) {
+                    Socket socket = mServerSocket.accept();
+                    startConnection(socket);
+                }
 
-
-    private ClientInfo parseUserInfoJson(String message) {
-        Log.d("TEST", message);
-        ClientInfo info = new ClientInfo();
-        try {
-            JSONObject json = new JSONObject(message);
-            info.name = json.getString("name");
-            info.lastName = json.getString("last_name");
-            info.group = json.getString("group");
-            info.clientId = json.getString("id");
-            info.isBlocked = json.getBoolean("block");
-            info.blockedBy = json.getString("block_by");
-            if (info.blockedBy.equals("none")) {
-                Log.d("TEST", "eq none");
-                info.isBlockedByOther = false;
-            } else if (info.blockedBy.equals(mServerName)) {
-                info.isBlockedByOther = true;
-            } else {
-                info.isBlockedByOther = false;
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    mServerSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return info;
-    }
-
-
-    private String parseClientIdFromJson(String message) {
-        String clientId = "";
-        try {
-            JSONObject json = new JSONObject(message);
-            clientId = json.getString("id");
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return clientId;
-    }
-
-    private String parseMethodFromJson(String message) {
-        String method = "";
-        try {
-            JSONObject json = new JSONObject(message);
-            method = json.getString("method");
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return method;
-    }
-
-    private String getTeacherInfoJson() {
-        JSONObject json = new JSONObject();
-        try {
-            json.put("code", INFO);
-            json.put("name", mServerInfo.name);
-            json.put("second_name", mServerInfo.secondName);
-            json.put("last_name", mServerInfo.lastName);
-            json.put("subject", mServerInfo.subject);
-            json.put("server_id", mServerInfo.serverId);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return json.toString();
-    }
-
-    private String createSimpleAnswerJson(int code, String message) {
-        JSONObject json = new JSONObject();
-        try {
-            json.put("code", code);
-            json.put("message", message);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return json.toString();
-    }
-
-
-    private void registerService(int port) {
-        NsdServiceInfo serviceInfo  = new NsdServiceInfo();
-        serviceInfo.setPort(port);
-        serviceInfo.setServiceName(mServerName);
-        serviceInfo.setServiceType(SERVICE_TYPE);
-
-        mNsdManager.registerService(
-                serviceInfo, NsdManager.PROTOCOL_DNS_SD, this);
-
-    }
-
-    private String getDisconnectJson() {
-        JSONObject json = new JSONObject();
-        try {
-            json.put("server_id", mServerName);
-            json.put("code", DISCONNECT);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        return json.toString();
-    }
-
-    /*
-        Start stop
-     */
-
-    public void start() {
-        Thread thread = new Thread(new ServerThread());
-        thread.start();
-    }
-
-    public void stop() {
-        disconnectAllClients();
-        mNsdManager.unregisterService(this);
-    }
-
-    /*
-        Block unblock
-     */
-    public void block(List<ClientInfo> selectedClients) {
-        for (ClientInfo info : selectedClients) {
-            info.connection.sendMessage(createSimpleAnswerJson(BLOCK_CODE, "block"));
         }
     }
-
-    public void unBlock(List<ClientInfo> selectedClients) {
-        for (ClientInfo info : selectedClients) {
-            info.connection.sendMessage(createSimpleAnswerJson(UNBLOCK_CODE, "unblock"));
-        }
-    }
-
-    /*
-        Interfaces
-     */
-
-    public void setOnNewUserConnectedListener(OnClientListChanged l) {
-        mOnClientListChanged = l;
-    }
-
-    public interface OnClientListChanged {
-        public void onClientListChanged(List<ClientInfo> clientsInfo);
-    }
-
-    public void setOnCheckNameListener(OnCheckName l) {
-        mOnCheckName = l;
-    }
-
-    public interface OnCheckName {
-        public void onCheckName(boolean free);
-    }
-
-    /*
-        Registration
-      */
-
-    public void registerService() {
-        if (mPort > -1 && !mIsRegistered && !mServerSocket.isClosed()) {
-            registerService(mPort);
-        }
-    }
-
-    public void unregisterService() {
-        if (mIsRegistered)
-            mNsdManager.unregisterService(this);
-    }
-
-    @Override
-    public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        Log.d("TEST", "registration failed");
-        mIsRegistered = false;
-    }
-
-    @Override
-    public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        Log.d("TEST", "unregistaion failed");
-        mIsRegistered = false;
-    }
-
-    @Override
-    public void onServiceRegistered(NsdServiceInfo serviceInfo) {
-        Log.d("TEST", "registration successful");
-        mIsRegistered = true;
-    }
-
-    @Override
-    public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
-        Log.d("TEST", "unregistration successful");
-        mIsRegistered = false;
-    }
-
-    /*
-        Discovery
-     */
-
-    public boolean isNameFree(String name) {
-        mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
-        return false;
-    }
-
-    @Override
-    public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-
-    }
-
-    @Override
-    public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-
-    }
-
-    @Override
-    public void onDiscoveryStarted(String serviceType) {
-
-    }
-
-    @Override
-    public void onDiscoveryStopped(String serviceType) {
-
-    }
-
-    @Override
-    public void onServiceFound(NsdServiceInfo serviceInfo) {
-
-    }
-
-    @Override
-    public void onServiceLost(NsdServiceInfo serviceInfo) {
-
-    }
-
-    /*
-        Resolve
-     */
-
-    @Override
-    public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-
-    }
-
-    @Override
-    public void onServiceResolved(NsdServiceInfo serviceInfo) {
-
-    }
-
-
 }

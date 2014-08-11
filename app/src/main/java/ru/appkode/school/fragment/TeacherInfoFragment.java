@@ -21,6 +21,14 @@ public class TeacherInfoFragment extends Fragment implements View.OnClickListene
     public static final int UNBLOCK = 1;
     public static final int DELETE = 2;
 
+    public void setOnUserActionPerformListener(OnUserActionPerform l) {
+        mOnUserActionPerform = l;
+    }
+
+    public interface OnUserActionPerform {
+        public void onUserActionPerform(int action);
+    }
+
     private String mName;
     private String mSubject;
 
@@ -89,13 +97,5 @@ public class TeacherInfoFragment extends Fragment implements View.OnClickListene
         if (mSubjectTextView != null) {
             mSubjectTextView.setText(mSubject);
         }
-    }
-
-    public void setOnUserActionPerformListener(OnUserActionPerform l) {
-        mOnUserActionPerform = l;
-    }
-
-    public interface OnUserActionPerform {
-        public void onUserActionPerform(int action);
     }
 }

@@ -14,18 +14,18 @@ import android.widget.TextView;
 import java.util.List;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.ClientInfo;
+import ru.appkode.school.data.ParcelableClientInfo;
 
 
 /**
  * Created by lexer on 02.08.14.
  */
-public class ClientListAdapter extends ArrayAdapter<ClientInfo> {
+public class ClientListAdapter extends ArrayAdapter<ParcelableClientInfo> {
 
-    private List<ClientInfo> mClientsInfo;
+    private List<ParcelableClientInfo> mClientsInfo;
     private int mResId;
 
-    public ClientListAdapter(Context context, int resource, List<ClientInfo> clientsInfo) {
+    public ClientListAdapter(Context context, int resource, List<ParcelableClientInfo> clientsInfo) {
         super(context, resource, clientsInfo);
         mClientsInfo = clientsInfo;
         mResId = resource;
@@ -50,14 +50,14 @@ public class ClientListAdapter extends ArrayAdapter<ClientInfo> {
             holder = (ViewHolder) v.getTag();
         }
 
-        final ClientInfo clientInfo = mClientsInfo.get(position);
+        final ParcelableClientInfo clientInfo = mClientsInfo.get(position);
         holder.group.setText(clientInfo.group);
         holder.name.setText(clientInfo.name + " " + clientInfo.lastName);
 
         if (clientInfo.isBlockedByOther) {
-            holder.otherBlock.setVisibility(View.GONE);
-        } else {
             holder.otherBlock.setVisibility(View.VISIBLE);
+        } else {
+            holder.otherBlock.setVisibility(View.GONE);
         }
 
         holder.isSelected.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -71,7 +71,7 @@ public class ClientListAdapter extends ArrayAdapter<ClientInfo> {
         return v;
     }
 
-    public void setClientsList(List<ClientInfo> clientsInfo) {
+    public void setClientsList(List<ParcelableClientInfo> clientsInfo) {
         if (mClientsInfo != clientsInfo) {
             mClientsInfo.clear();
             mClientsInfo.addAll(clientsInfo);

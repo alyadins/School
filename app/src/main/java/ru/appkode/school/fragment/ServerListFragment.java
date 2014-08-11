@@ -3,14 +3,12 @@ package ru.appkode.school.fragment;
 import android.app.ListFragment;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.widget.AdapterView;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.ServerInfo;
+import ru.appkode.school.data.ParcelableServerInfo;
 import ru.appkode.school.gui.ServerListAdapter;
 
 /**
@@ -22,7 +20,7 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     public static final int CONNECT = 0;
     public static final int DISCONNECT = 1;
 
-    private List<ServerInfo> mServerList;
+    private List<ParcelableServerInfo> mServerList;
 
     private ServerListAdapter mAdapter;
 
@@ -31,12 +29,12 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        mServerList = new ArrayList<ServerInfo>();
+        mServerList = new ArrayList<ParcelableServerInfo>();
 
         setServerList(mServerList);
     }
 
-    public void setServerList(List<ServerInfo> serverList) {
+    public void setServerList(List<ParcelableServerInfo> serverList) {
         mServerList = serverList;
         if (serverList != null) {
             if (mAdapter == null) {
@@ -50,14 +48,14 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     }
 
     @Override
-    public void onClientDisconnect(ServerInfo info) {
+    public void onClientDisconnect(ParcelableServerInfo info) {
         if (mOnServerAction != null) {
             mOnServerAction.onServerAction(info, DISCONNECT);
         }
     }
 
     @Override
-    public void onClientConnect(ServerInfo info) {
+    public void onClientConnect(ParcelableServerInfo info) {
         Log.d("TEST", "connect");
         if (mOnServerAction != null) {
             mOnServerAction.onServerAction(info, CONNECT);
@@ -69,6 +67,6 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     }
 
     public interface OnServerAction {
-        public void onServerAction(ServerInfo info, int action);
+        public void onServerAction(ParcelableServerInfo info, int action);
     }
 }

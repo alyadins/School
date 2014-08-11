@@ -2,10 +2,13 @@ package ru.appkode.school.activity;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -13,41 +16,45 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import ru.appkode.school.R;
-import ru.appkode.school.data.ClientInfo;
-import ru.appkode.school.data.ServerInfo;
+import ru.appkode.school.data.ParcelableClientInfo;
+import ru.appkode.school.data.ParcelableServerInfo;
 import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
 import ru.appkode.school.network.ClientConnection;
 import ru.appkode.school.network.Server;
+import ru.appkode.school.service.ClientService;
+import ru.appkode.school.service.ServerService;
 import ru.appkode.school.util.StringUtil;
 
+import static ru.appkode.school.service.ClientService.*;
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 
 /**
  * Created by lexer on 01.08.14.
  */
-public class StudentActivity extends Activity implements ClientConnection.OnTeacherListChanged, ServerListFragment.OnServerAction, ClientConnection.OnStatusChanged {
+public class StudentActivity extends Activity implements ServerListFragment.OnServerAction {
 
-    private ClientInfo mClientInfo;
-
+    //fragments
+    private FragmentManager mFragmentManager;
     private StudentInfoFragment mStudentInfoFragment;
     private TabsFragment mTabsFragment;
-
-    private FragmentManager mFragmentManager;
-
-    private ClientConnection mClientConnection;
-
-    private List<ServerInfo> mServersInfo;
-
-    private ServerInfo mCurrentServer;
-
     private ServerListFragment mServerListFragment;
+
+    //data
+    private List<ParcelableServerInfo> mServersInfo;
+    private ParcelableServerInfo mCurrentServer;
+    private ParcelableClientInfo mClientInfo;
+
+    private AlertDialog mLoginDialog;
+    private BroadcastReceiver mBroadcastReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,28 +91,23 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
             ServerListFragment slf2 = new ServerListFragment();
             mTabsFragment.setLeftFragment(slf2, ServerListFragment.TAG + "2");
         }
-
-        mClientConnection = new ClientConnection(this);
-        mClientConnection.setOnTeacherListChangedListener(this);
-        mClientConnection.setOnStatusChangedListener(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        mClientConnection.discover();
-        mServerListFragment.setServerList(mServersInfo);
+        initBroadCastReceiver();
     }
+
 
     @Override
     protected void onPause() {
+        unregisterReceiver(mBroadcastReceiver);
         super.onPause();
-        mClientConnection.stopDiscover();
     }
 
     @Override
     protected void onStop() {
-        mClientConnection.disconnectFromServer(mClientInfo);
         super.onStop();
     }
 
@@ -120,41 +122,36 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.refresh) {
-            Log.d("TEST", "onOption");
-            mClientConnection.stopDiscover();
-            mClientConnection.discover();
+            sendCommandToService(GET_NAMES, null);
         } else
         if (item.getItemId() == R.id.about) {
-            Log.d("TEST", "setting list with length = " + mServersInfo.size());
-            mServerListFragment.setServerList(mClientConnection.getServersInfo());
         }
 
         return super.onOptionsItemSelected(item);
     }
 
     @Override
-    public void onServerAction(ServerInfo info, int action) {
+    public void onServerAction(ParcelableServerInfo info, int action) {
         switch (action) {
             case ServerListFragment.CONNECT:
-                if (mClientInfo.connection == null)
-                    mClientConnection.disconnectFromServer(mClientInfo);
-                mClientConnection.connectToServer(info, mClientInfo);
+                sendConnectComandToService(DISCONNECT, null);
+                sendConnectComandToService(CONNECT, info);
                 break;
             case ServerListFragment.DISCONNECT:
-                mClientConnection.disconnectFromServer(mClientInfo);
+                sendConnectComandToService(DISCONNECT, null);
         }
     }
 
-    @Override
-    public void onTeacherListChanged(ClientConnection connection, List<ServerInfo> serversInfo) {
-        mServersInfo = serversInfo;
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mServerListFragment.setServerList(mServersInfo);
-            }
-        });
-    }
+//    @Override
+//    public void onTeacherListChanged(ClientConnection connection, List<ParcelableServerInfo> serversInfo) {
+//        mServersInfo = serversInfo;
+//        runOnUiThread(new Runnable() {
+//            @Override
+//            public void run() {
+//                mServerListFragment.setServerList(mServersInfo);
+//            }
+//        });
+//    }
 
     private void showStudentLoginDialog() {
         LayoutInflater inflater = getLayoutInflater();
@@ -167,18 +164,18 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
                 .setPositiveButton(R.string.ok, null)
                 .setNegativeButton(R.string.cancel, null);
 
-        final AlertDialog dialog = builder.create();
-        dialog.show();
+        mLoginDialog = builder.create();
+        mLoginDialog.show();
 
-        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+        mLoginDialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                loadStudentInfo(v, dialog);
+                loadStudentInfo(v);
             }
         });
     }
 
-    private void loadStudentInfo(View v, Dialog dialog) {
+    private void loadStudentInfo(View v) {
         String name = getTextFromEditTextById(R.id.name, v);
         String lastName = getTextFromEditTextById(R.id.last_name, v);
         String group = getTextFromEditTextById(R.id.group, v);
@@ -190,50 +187,55 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
             return;
 
         String clientId = "client" + StringUtil.md5(name + lastName + group);
-        mClientInfo = new ClientInfo(name, lastName, group);
+        mClientInfo = new ParcelableClientInfo(name, lastName, group);
         mClientInfo.clientId = clientId;
 
-        dialog.dismiss();
-
-        setUserInfo();
+        sendCommandToService(IS_FREE, mClientInfo);
     }
+//
+//    @Override
+//    public void OnStatusChanged(final int status, final String serverId) {
+//        runOnUiThread(new Runnable() {
+//            @Override
+//            public void run() {
+//                ParcelableServerInfo info;
+//                switch (status) {
+//                    case Server.BLOCK_CODE:
+//                        mClientInfo.isBlocked = true;
+//                        mStudentInfoFragment.setBlock(true);
+//                        mClientInfo.blockedBy = serverId;
+//                        break;
+//                    case Server.UNBLOCK_CODE:
+//                        mClientInfo.isBlocked = false;
+//                        mStudentInfoFragment.setBlock(false);
+//                        break;
+//                    case Server.CONNECTED:
+//                        info = getServerInfoById(serverId);
+//                        if (info != null && info.isConnected == false) {
+//                            info.isConnected = true;
+//                            Log.d("TEST", "connected to " + info.name + "  " + info.lastName);
+//                            mCurrentServer = info;
+//                            mServerListFragment.setServerList(mServersInfo);
+//                        }
+//                        break;
+//                    case Server.DISCONNECT:
+//                        info = getServerInfoById(serverId);
+//                        if (info != null && info.isConnected == true) {
+//                            info.isConnected = false;
+//                            mServerListFragment.setServerList(mServersInfo);
+//                        }
+//                        break;
+//                    case Server.DISCONNECTED:
+//                        info = getServerInfoById(serverId);
+//                        Log.d("TEST", "disconnected from " + info.name + " " + info.lastName);
+//                        break;
+//                }
+//            }
+//        });
+//    }
 
-    @Override
-    public void OnStatusChanged(final int status, final String serverId) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                ServerInfo info;
-                switch (status) {
-                    case Server.BLOCK_CODE:
-                        mClientInfo.isBlocked = true;
-                        mStudentInfoFragment.setBlock(true);
-                        mClientInfo.blockedBy = serverId;
-                        break;
-                    case Server.UNBLOCK_CODE:
-                        mClientInfo.isBlocked = false;
-                        mStudentInfoFragment.setBlock(false);
-                        break;
-                    case Server.CONNECTED:
-                        info = getServerInfoById(serverId);
-                        if (info != null) {
-                            info.isConnected = true;
-                        }
-                        mCurrentServer = info;
-                        mServerListFragment.setServerList(mServersInfo);
-                        break;
-                    case Server.DISCONNECT:
-                        info = getServerInfoById(serverId);
-                        info.isConnected = false;
-                        mServerListFragment.setServerList(mServersInfo);
-                        break;
-                }
-            }
-        });
-    }
-
-    private ServerInfo getServerInfoById(String serverId) {
-        for (ServerInfo info : mServersInfo) {
+    private ParcelableServerInfo getServerInfoById(String serverId) {
+        for (ParcelableServerInfo info : mServersInfo) {
             if (info.serverId.equals(serverId))
                 return info;
         }
@@ -241,10 +243,69 @@ public class StudentActivity extends Activity implements ClientConnection.OnTeac
         return null;
     }
 
+    private void initBroadCastReceiver() {
+        mBroadcastReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                int code = intent.getIntExtra(CODE, -1);
+                switch (code) {
+                    case START:
+                        Log.d("TEST", "started");
+                        break;
+                    case STOP:
+                        Log.d("TEST", "stop");
+                        break;
+                    case IS_FREE:
+                        boolean isFree = intent.getBooleanExtra(MESSAGE, false);
+                        if (isFree) {
+                            mLoginDialog.dismiss();
+                            setUserInfo();
+                        } else {
+                            Toast.makeText(StudentActivity.this, "Занято", Toast.LENGTH_LONG).show();
+                        }
+                        break;
+                    case CONNECT:
+                        break;
+                    case DISCONNECT:
+                        break;
+                    case GET_NAMES:
+                        ArrayList<ParcelableServerInfo> servers = intent.getParcelableArrayListExtra(NAMES);
+                        mServerListFragment.setServerList(servers);
+                        break;
+                    case BLOCK:
+                        break;
+                    case UNBLOCK:
+                        break;
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter(BROADCAST_ACTION);
+        registerReceiver(mBroadcastReceiver, filter);
+    }
+
+    private void sendCommandToService(int action, ParcelableClientInfo info) {
+        Intent intent = new Intent(StudentActivity.this, ClientService.class);
+        intent.putExtra(ACTION, action);
+        if (info != null)
+            intent.putExtra(NAME, info);
+        startService(intent);
+    }
+
+    private void sendConnectComandToService(int action, ParcelableServerInfo info) {
+        Intent intent = new Intent(StudentActivity.this, ClientService.class);
+        intent.putExtra(ACTION, action);
+        if (info != null)
+            intent.putExtra(NAME, info);
+        startService(intent);
+    }
+
     private void setUserInfo() {
 
         mStudentInfoFragment.setUserName(mClientInfo.name + " " + mClientInfo.lastName);
         mStudentInfoFragment.setGroup(mClientInfo.group);
         mStudentInfoFragment.setBlock(mClientInfo.isBlocked);
+
+        sendCommandToService(START, mClientInfo);
     }
 }
