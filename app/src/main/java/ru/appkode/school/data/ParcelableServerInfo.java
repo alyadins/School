@@ -54,7 +54,6 @@ public class ParcelableServerInfo implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        Log.d("TEST", "write to parcel id = " + this.serverId);
         dest.writeStringArray(new String[] {this.subject,
                 this.name,
                 this.secondName,

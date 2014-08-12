@@ -88,7 +88,7 @@ public class Server implements Connection.OnMessageReceivedListener{
         for (ParcelableClientInfo info : selectedClients) {
             ClientConnectionData data = getConnectionDataById(info.clientId);
             try {
-                data.connection.sendMessage(JSONHelper.createSimpleAnswer(BLOCK_CODE, "block"));
+                data.connection.sendMessage(JSONHelper.createConnectionMessage(BLOCK_CODE, "block", mServerId));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -102,7 +102,7 @@ public class Server implements Connection.OnMessageReceivedListener{
             parcelableClientInfo.isBlockedByOther = false;
             parcelableClientInfo.isChosen = true;
             try {
-                data.connection.sendMessage(JSONHelper.createSimpleAnswer(UNBLOCK_CODE, "unblock"));
+                data.connection.sendMessage(JSONHelper.createConnectionMessage(UNBLOCK_CODE, "unblock", mServerId));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -173,14 +173,14 @@ public class Server implements Connection.OnMessageReceivedListener{
         Log.d("TEST", message);
         int method = JSONHelper.parseMethod(message);
         switch (method) {
-            case INFO_CODE:
+            case INFO:
                 processInfo(connection);
                 break;
             case CONNECT:
                 processConnect(connection, message);
                 break;
             case DISCONNECT:
-                processConnect(connection, message);
+                processDisconnect(connection, message);
                 break;
             default:
                 connection.sendMessage(JSONHelper.createSimpleAnswer(COMMAND_NOT_FOUND, "command not found"));
@@ -269,6 +269,7 @@ public class Server implements Connection.OnMessageReceivedListener{
             try {
                 mServerSocket = new ServerSocket(0);
                 mPort = mServerSocket.getLocalPort();
+                Log.d("TEST", "Server socket has opened");
                 while (!Thread.currentThread().isInterrupted()) {
                     Socket socket = mServerSocket.accept();
                     startConnection(socket);

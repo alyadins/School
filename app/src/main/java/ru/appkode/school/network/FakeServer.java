@@ -1,5 +1,7 @@
 package ru.appkode.school.network;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 
@@ -16,6 +18,8 @@ public class FakeServer {
                 try {
                     ServerSocket socket = new ServerSocket(0);
                     mPort = socket.getLocalPort();
+                    socket.close();
+                    Log.d("TEST", "fake server started at port " + mPort);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

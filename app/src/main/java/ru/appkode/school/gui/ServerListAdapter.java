@@ -60,7 +60,6 @@ public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
         holder.subject.setText(info.subject);
         holder.isConnected.setOnCheckedChangeListener(null);
         holder.isConnected.setChecked(info.isConnected);
-        Log.d("TEST", "setChecked for " + fullTeacherName + "  " + info.isConnected);
         holder.isConnected.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {

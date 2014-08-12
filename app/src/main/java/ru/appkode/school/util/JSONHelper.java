@@ -1,5 +1,6 @@
 package ru.appkode.school.util;
 
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -44,7 +45,7 @@ public class JSONHelper {
     public static String createServerDisconnect(String serverId) throws JSONException {
         JSONObject json = new JSONObject();
         json.put("server_id", serverId);
-        json.put("code", Server.DISCONNECT);
+        json.put("code", Server.DISCONNECTED);
         return json.toString();
     }
 
@@ -66,13 +67,13 @@ public class JSONHelper {
     public static String createClientDisconnect(ParcelableClientInfo info) throws JSONException {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("id", info.clientId);
-        jsonObject.put("method", "disconnect");
+        jsonObject.put("method", Server.DISCONNECT);
         return jsonObject.toString();
     }
 
     public static String createInfoRequest() throws JSONException {
         JSONObject json = new JSONObject();
-        json.put("method", "info");
+        json.put("method", Server.INFO);
         return json.toString();
     }
 

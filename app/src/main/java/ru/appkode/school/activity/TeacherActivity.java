@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -18,6 +19,7 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 
+import ru.appkode.school.Infos;
 import ru.appkode.school.R;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
@@ -55,7 +57,10 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teacher);
-        showTeacherLoginDialog();
+
+        Intent intent = new Intent(TeacherActivity.this, ServerService.class);
+        intent.putExtra(ACTION, STATUS);
+        startService(intent);
 
         mFragmentManager = getFragmentManager();
 
@@ -113,6 +118,14 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 intent.putExtra(ACTION, STOP);
                 startService(intent);
                 showTeacherLoginDialog();
+                break;
+            case R.id.about:
+                Log.d("TEST", "clear sp");
+                SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
+                SharedPreferences.Editor editor = preferences.edit();
+                editor.clear();
+                editor.commit();
+                break;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -164,7 +177,11 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 .append(mServerInfo.subject);
 
         mServerInfo.serverId = "serv" + StringUtil.md5(buffer.toString());
-        sendCommandToService(IS_NAME_FREE, mServerInfo);
+        Log.d("TEST", "send is name free");
+        Intent intent = new Intent(TeacherActivity.this, ServerService.class);
+        intent.putExtra(ACTION, IS_NAME_FREE);
+        intent.putExtra(NAME, mServerInfo);
+        startService(intent);
     }
 
     private void setTeacherInfo() {
@@ -173,8 +190,6 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 mServerInfo.lastName);
 
         mTeacherInfoFragment.setSubject(mServerInfo.subject);
-
-        sendCommandToService(START, mServerInfo);
     }
 
     @Override
@@ -211,7 +226,8 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                         boolean isFree = intent.getBooleanExtra(MESSAGE, false);
                         if (isFree) {
                             mDialog.dismiss();
-                            setTeacherInfo();
+                            sendCommandToService(START, mServerInfo);
+                            sendCommandToService(STATUS, null);
                         } else {
                             Toast.makeText(TeacherActivity.this, "Занято", Toast.LENGTH_LONG).show();
                         }
@@ -229,6 +245,19 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                         break;
                     case ServerService.DELETE:
                         Log.d("TEST", "deleted");
+                        break;
+                    case STATUS:
+                        Log.d("TEST", "status");
+                        boolean isInit = intent.getBooleanExtra(IS_INIT, false);
+                        if (isInit) {
+                            mServerInfo = intent.getParcelableExtra(NAME);
+                            ArrayList<ParcelableClientInfo> i = intent.getParcelableArrayListExtra(NAMES);
+                            mClientListFragment.setClients(i);
+                            Log.d("TEST", "setteacher info " + mServerInfo.name + " " + mServerInfo.lastName);
+                            setTeacherInfo();
+                        } else {
+                            showTeacherLoginDialog();
+                        }
                         break;
                 }
             }

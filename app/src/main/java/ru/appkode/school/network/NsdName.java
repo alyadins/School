@@ -6,8 +6,10 @@ import android.util.Log;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -16,25 +18,32 @@ import java.util.concurrent.BlockingQueue;
 public class NsdName{
 
     public static final String SERVICE_TYPE = "_http._tcp.";
-    private static final int SERVER = 0;
-    private static final int CLIENT = 1;
+    public static final int SERVER = 0;
+    public static final int CLIENT = 1;
     private static final int UNKNOWN = 2;
+
+    private static final int CAPACITY = 50;
 
     private NsdManager mManager;
 
     private List<NsdServiceInfo> mDiscoveredServices;
     private List<NsdServiceInfo> mResolvedServices;
-    private Queue<NsdServiceInfo> mResolveQueue;
+    private BlockingQueue<NsdServiceInfo> mResolveQueue;
 
     private boolean mIsDiscoveryStarted = false;
+    private boolean mIsResolving = false;
 
     private NsdManager.DiscoveryListener mDiscoveryListener;
     private NsdManager.ResolveListener mResolveListener;
 
-    public NsdName(NsdManager mManager) {
+    private int mType;
+
+    public NsdName(NsdManager mManager, int type) {
         this.mManager = mManager;
         mDiscoveredServices = new ArrayList<NsdServiceInfo>();
         mResolvedServices = new ArrayList<NsdServiceInfo>();
+        mResolveQueue = new ArrayBlockingQueue<NsdServiceInfo>(CAPACITY);
+        mType = type;
         initDiscoveryListener();
         initResolveListener();
     }
@@ -66,29 +75,8 @@ public class NsdName{
         return mDiscoveredServices;
     }
 
-    public void resolveServices(Queue<NsdServiceInfo> resolveQueue) {
-        mResolveQueue = resolveQueue;
-        resolveNext();
-    }
-
-
     public List<NsdServiceInfo> getResolvedServices() {
         return mResolvedServices;
-    }
-
-
-    public void resolveServers() {
-        Queue<NsdServiceInfo> infos = new ArrayDeque<NsdServiceInfo>();
-        for (NsdServiceInfo si : mDiscoveredServices) {
-            if (getTypeOfService(si.getServiceName()) == SERVER) {
-                infos.add(si);
-            }
-        }
-        resolveServices(infos);
-    }
-
-    public boolean isResolveQueueEmpty() {
-        return mResolveQueue.isEmpty();
     }
 
     private int getTypeOfService(String id) {
@@ -151,7 +139,6 @@ public class NsdName{
 
             @Override
             public void onDiscoveryStarted(String serviceType) {
-                Log.d("TEST", "discovery started");
                 mIsDiscoveryStarted = true;
             }
 
@@ -162,14 +149,23 @@ public class NsdName{
 
             @Override
             public void onServiceFound(NsdServiceInfo serviceInfo) {
+                Log.d("TEST", "found " + serviceInfo.getServiceName());
                 if (!isServiceDiscovered(serviceInfo)) {
-                    Log.d("TEST", "found service " + serviceInfo.getServiceName());
                     mDiscoveredServices.add(serviceInfo);
+                    if (getTypeOfService(serviceInfo.getServiceName()) == SERVER && mType != SERVER) {
+                        if (mResolveQueue.isEmpty() && !mIsResolving) {
+                            mResolveQueue.add(serviceInfo);
+                            resolveNext();
+                        } else {
+                            mResolveQueue.add(serviceInfo);
+                        }
+                    }
                 }
             }
 
             @Override
             public void onServiceLost(NsdServiceInfo serviceInfo) {
+                Log.d("TEST", "lost " + serviceInfo.getServiceName());
                 removeDiscoveredService(serviceInfo);
                 removeResolvedService(serviceInfo);
             }
@@ -191,18 +187,21 @@ public class NsdName{
             @Override
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
                 resolveNext();
-                Log.d("TEST", "resolced " + serviceInfo.getServiceName());
+                Log.d("TEST", "resolved " + serviceInfo.getServiceName());
                 mResolvedServices.add(serviceInfo);
             }
         };
     }
 
     private void resolveNext() {
+        if (!mIsResolving)
+            mIsResolving = true;
         if (!mResolveQueue.isEmpty()) {
             NsdServiceInfo info = mResolveQueue.poll();
-            if (!isServiceResolved(info)) {
-                mManager.resolveService(info, mResolveListener);
-            }
+            Log.d("TEST", "try to resolve " + info.getServiceName());
+            mManager.resolveService(info, mResolveListener);
+        } else {
+            mIsResolving = false;
         }
     }
 

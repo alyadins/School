@@ -43,7 +43,8 @@ public class NsdRegistration implements NsdManager.RegistrationListener {
     }
 
     public void stop() {
-        mManager.unregisterService(this);
+        if (mIsRegistered)
+            mManager.unregisterService(this);
     }
 
     private void register() {

@@ -23,17 +23,12 @@ import static ru.appkode.school.util.JSONHelper.*;
  */
 public class ClientConnection implements Connection.OnMessageReceivedListener {
 
-
-    public static final String SERVICE_TYPE = "_http._tcp.";
-
     private static final String TAG = "ClientConnection";
 
     private ArrayList<ParcelableServerInfo> mServersInfo;
     private ParcelableClientInfo mClientInfo;
     private List<ServerConnectionData> mServers;
 
-    private static final int CAPACITY = 50;
-    private static final int DELAY = 1500;
 
     public interface OnStatusChanged {
         public void OnStatusChanged(int status, String serverId);
@@ -48,6 +43,7 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
     private OnTeacherListChanged mOnTeacherListChanged;
     private OnStatusChanged mOnStatusChanged;
+    private OnServerInfoDownload mOnServerInfoDownload;
 
 
     public ClientConnection() {
@@ -80,21 +76,11 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
     }
 
     public void askForServersInfo(List<NsdServiceInfo> infos) {
-        ArrayList<ParcelableServerInfo> oldInfos = new ArrayList<ParcelableServerInfo>();
-        oldInfos.addAll(mServersInfo);
+        mServers.clear();
+        mServersInfo.clear();
         for (NsdServiceInfo info : infos) {
-            if (!isServerInfoDownload(info, oldInfos))
-                askForServerInfo(info);
+            askForServerInfo(info);
         }
-    }
-
-    private boolean isServerInfoDownload(NsdServiceInfo info, ArrayList<ParcelableServerInfo> infos) {
-        for (ParcelableServerInfo si : infos) {
-            if (si.serverId.equals(info.getServiceName()))
-                return true;
-        }
-
-        return false;
     }
 
     public ArrayList<ParcelableServerInfo> getServersInfo() {
@@ -103,17 +89,19 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
     private void askForServerInfo(final NsdServiceInfo serviceInfo) {
         try {
+            Log.d("TEST", "ask info from " + serviceInfo.getHost() + " " + serviceInfo.getPort());
             Connection connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
             connection.setOnMessageReceivedListener(new Connection.OnMessageReceivedListener() {
                 @Override
                 public void onReceiveMessage(Connection connection, String message) {
-                    Log.d("TEST", message);
                     try {
                         if (parseCode(message) == Server.INFO_CODE) {
                             ParcelableServerInfo serverInfo = parseServerInfo(message);
-                            Log.d("TEST", "recived " + serverInfo.name + "  " + serverInfo.lastName);
                             mServers.add(new ServerConnectionData(serverInfo.serverId, serviceInfo));
                             mServersInfo.add(serverInfo);
+                            if (mOnServerInfoDownload != null) {
+                                mOnServerInfoDownload.OnServerInfoDownload(serverInfo);
+                            }
                             connection.sendMessage("END");
                         } else {
                             Log.e(TAG, "server error");
@@ -123,7 +111,6 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
                     }
                 }
             });
-            Log.d("TEST", "asked");
             connection.start();
             connection.sendMessage(createInfoRequest());
         } catch (IOException e) {
@@ -200,5 +187,13 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
     public void setOnTeacherListChangedListener(OnTeacherListChanged l) {
         mOnTeacherListChanged = l;
+    }
+
+    public void setOnServerInfoDownloadListener(OnServerInfoDownload l) {
+        mOnServerInfoDownload = l;
+    }
+
+    public interface OnServerInfoDownload {
+        public void OnServerInfoDownload(ParcelableServerInfo info);
     }
 }

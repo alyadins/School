@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -27,10 +29,7 @@ import ru.appkode.school.data.ParcelableServerInfo;
 import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
-import ru.appkode.school.network.ClientConnection;
-import ru.appkode.school.network.Server;
 import ru.appkode.school.service.ClientService;
-import ru.appkode.school.service.ServerService;
 import ru.appkode.school.util.StringUtil;
 
 import static ru.appkode.school.service.ClientService.*;
@@ -54,6 +53,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
     private ParcelableClientInfo mClientInfo;
 
     private AlertDialog mLoginDialog;
+    private ProgressDialog mWaitDialog;
     private BroadcastReceiver mBroadcastReceiver;
 
     @Override
@@ -91,12 +91,14 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
             ServerListFragment slf2 = new ServerListFragment();
             mTabsFragment.setLeftFragment(slf2, ServerListFragment.TAG + "2");
         }
+        mServersInfo = new ArrayList<ParcelableServerInfo>();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         initBroadCastReceiver();
+        sendCommandToService(STATUS, null);
     }
 
 
@@ -123,6 +125,9 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.refresh) {
             sendCommandToService(GET_NAMES, null);
+            mWaitDialog = new ProgressDialog(this);
+            mWaitDialog.setMessage("Пожалуйста подождите");
+            mWaitDialog.show();
         } else
         if (item.getItemId() == R.id.about) {
         }
@@ -134,24 +139,14 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
     public void onServerAction(ParcelableServerInfo info, int action) {
         switch (action) {
             case ServerListFragment.CONNECT:
-                sendConnectComandToService(DISCONNECT, null);
-                sendConnectComandToService(CONNECT, info);
+                sendConnectCommandToService(DISCONNECT, null);
+                Handler handler = new Handler();
+                sendConnectCommandToService(CONNECT, info);
                 break;
             case ServerListFragment.DISCONNECT:
-                sendConnectComandToService(DISCONNECT, null);
+                sendConnectCommandToService(DISCONNECT, null);
         }
     }
-
-//    @Override
-//    public void onTeacherListChanged(ClientConnection connection, List<ParcelableServerInfo> serversInfo) {
-//        mServersInfo = serversInfo;
-//        runOnUiThread(new Runnable() {
-//            @Override
-//            public void run() {
-//                mServerListFragment.setServerList(mServersInfo);
-//            }
-//        });
-//    }
 
     private void showStudentLoginDialog() {
         LayoutInflater inflater = getLayoutInflater();
@@ -190,49 +185,12 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         mClientInfo = new ParcelableClientInfo(name, lastName, group);
         mClientInfo.clientId = clientId;
 
+        Log.d("TEST", "send is free command");
+
+
         sendCommandToService(IS_FREE, mClientInfo);
     }
-//
-//    @Override
-//    public void OnStatusChanged(final int status, final String serverId) {
-//        runOnUiThread(new Runnable() {
-//            @Override
-//            public void run() {
-//                ParcelableServerInfo info;
-//                switch (status) {
-//                    case Server.BLOCK_CODE:
-//                        mClientInfo.isBlocked = true;
-//                        mStudentInfoFragment.setBlock(true);
-//                        mClientInfo.blockedBy = serverId;
-//                        break;
-//                    case Server.UNBLOCK_CODE:
-//                        mClientInfo.isBlocked = false;
-//                        mStudentInfoFragment.setBlock(false);
-//                        break;
-//                    case Server.CONNECTED:
-//                        info = getServerInfoById(serverId);
-//                        if (info != null && info.isConnected == false) {
-//                            info.isConnected = true;
-//                            Log.d("TEST", "connected to " + info.name + "  " + info.lastName);
-//                            mCurrentServer = info;
-//                            mServerListFragment.setServerList(mServersInfo);
-//                        }
-//                        break;
-//                    case Server.DISCONNECT:
-//                        info = getServerInfoById(serverId);
-//                        if (info != null && info.isConnected == true) {
-//                            info.isConnected = false;
-//                            mServerListFragment.setServerList(mServersInfo);
-//                        }
-//                        break;
-//                    case Server.DISCONNECTED:
-//                        info = getServerInfoById(serverId);
-//                        Log.d("TEST", "disconnected from " + info.name + " " + info.lastName);
-//                        break;
-//                }
-//            }
-//        });
-//    }
+
 
     private ParcelableServerInfo getServerInfoById(String serverId) {
         for (ParcelableServerInfo info : mServersInfo) {
@@ -248,12 +206,13 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
             @Override
             public void onReceive(Context context, Intent intent) {
                 int code = intent.getIntExtra(CODE, -1);
+                ParcelableServerInfo info;
+                String id;
+                Log.d("TEST", code + " ");
                 switch (code) {
                     case START:
-                        Log.d("TEST", "started");
                         break;
                     case STOP:
-                        Log.d("TEST", "stop");
                         break;
                     case IS_FREE:
                         boolean isFree = intent.getBooleanExtra(MESSAGE, false);
@@ -265,16 +224,47 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         }
                         break;
                     case CONNECT:
+                        id = intent.getStringExtra(MESSAGE);
+                        if (id != null) {
+                            info = getServerInfoById(id);
+                            if (info != null && info.isConnected == false) {
+                                if (mCurrentServer != null) {
+                                    mCurrentServer.isConnected = false;
+                                }
+                                info.isConnected = true;
+                                mCurrentServer = info;
+                                mServerListFragment.setServerList(mServersInfo);
+                            }
+                        }
                         break;
                     case DISCONNECT:
+                        id = intent.getStringExtra(MESSAGE);
+                        info = getServerInfoById(id);
+                        if (info != null) {
+                            info.isConnected = false;
+                            mServerListFragment.setServerList(mServersInfo);
+                        }
                         break;
                     case GET_NAMES:
                         ArrayList<ParcelableServerInfo> servers = intent.getParcelableArrayListExtra(NAMES);
+                        mServersInfo = servers;
                         mServerListFragment.setServerList(servers);
+                        if (mWaitDialog != null)
+                            mWaitDialog.dismiss();
                         break;
                     case BLOCK:
+                        id = intent.getStringExtra(MESSAGE);
+                        mClientInfo.isBlocked = true;
+                        mStudentInfoFragment.setBlock(true);
+                        mClientInfo.blockedBy = id;
+                        sendCommandToService(UPDATE_INFO, mClientInfo);
                         break;
                     case UNBLOCK:
+                        mClientInfo.isBlocked = false;
+                        sendCommandToService(UPDATE_INFO, mClientInfo);
+                        mStudentInfoFragment.setBlock(false);
+                        break;
+                    case STATUS:
                         break;
                 }
             }
@@ -292,7 +282,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         startService(intent);
     }
 
-    private void sendConnectComandToService(int action, ParcelableServerInfo info) {
+    private void sendConnectCommandToService(int action, ParcelableServerInfo info) {
         Intent intent = new Intent(StudentActivity.this, ClientService.class);
         intent.putExtra(ACTION, action);
         if (info != null)
