@@ -1,8 +1,14 @@
 package ru.appkode.school.util;
 
 
+import android.util.Log;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
@@ -45,8 +51,13 @@ public class JSONHelper {
     public static String createServerDisconnect(String serverId) throws JSONException {
         JSONObject json = new JSONObject();
         json.put("server_id", serverId);
-        json.put("code", Server.DISCONNECTED);
+        json.put("code", Server.DISCONNECT);
         return json.toString();
+    }
+
+    public static String createWhiteListJson(List<String> whiteList) {
+        JSONArray array = new JSONArray(whiteList);
+        return array.toString();
     }
 
     /*
@@ -132,5 +143,16 @@ public class JSONHelper {
     public static String parseServerId(String message) throws JSONException {
         JSONObject json = new JSONObject(message);
         return json.getString("server_id");
+    }
+
+    public static List<String> parseWhiteList(String result) throws JSONException {
+        List<String> whiteList = new ArrayList<String>();
+        JSONArray appArray = new JSONArray(result);
+
+        for (int i = 0; i < appArray.length(); i++) {
+            whiteList.add(appArray.getString(i));
+        }
+
+        return whiteList;
     }
 }

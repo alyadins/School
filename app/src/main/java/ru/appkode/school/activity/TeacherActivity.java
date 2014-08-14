@@ -177,7 +177,8 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 .append(mServerInfo.subject);
 
         mServerInfo.serverId = "serv" + StringUtil.md5(buffer.toString());
-        Log.d("TEST", "send is name free");
+
+
         Intent intent = new Intent(TeacherActivity.this, ServerService.class);
         intent.putExtra(ACTION, IS_NAME_FREE);
         intent.putExtra(NAME, mServerInfo);
@@ -253,7 +254,6 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                             mServerInfo = intent.getParcelableExtra(NAME);
                             ArrayList<ParcelableClientInfo> i = intent.getParcelableArrayListExtra(NAMES);
                             mClientListFragment.setClients(i);
-                            Log.d("TEST", "setteacher info " + mServerInfo.name + " " + mServerInfo.lastName);
                             setTeacherInfo();
                         } else {
                             showTeacherLoginDialog();

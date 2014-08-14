@@ -1,5 +1,6 @@
 package ru.appkode.school.network;
 
+import android.os.Handler;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -34,11 +35,10 @@ public class Server implements Connection.OnMessageReceivedListener{
 
     public static final int BLOCK_CODE = 500;
     public static final int UNBLOCK_CODE = 501;
-    public static final int DELETE_CODE = 502;
+    public static final int DISCONNECT = 502;
 
     public static final int INFO = 0;
     public static final int CONNECT = 1;
-    public static final int DISCONNECT = 2;
 
     /*
         Interfaces
@@ -87,11 +87,16 @@ public class Server implements Connection.OnMessageReceivedListener{
     public void block(List<ParcelableClientInfo> selectedClients){
         for (ParcelableClientInfo info : selectedClients) {
             ClientConnectionData data = getConnectionDataById(info.clientId);
+            ParcelableClientInfo infoForChange = getClientsInfoById(info.clientId);
             try {
                 data.connection.sendMessage(JSONHelper.createConnectionMessage(BLOCK_CODE, "block", mServerId));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
+            infoForChange.isBlocked = true;
+        }
+        if (mOnClientListChanged != null) {
+            mOnClientListChanged.onClientListChanged((mClientsInfo));
         }
     }
 
@@ -101,6 +106,7 @@ public class Server implements Connection.OnMessageReceivedListener{
             ParcelableClientInfo parcelableClientInfo = getClientsInfoById(info.clientId);
             parcelableClientInfo.isBlockedByOther = false;
             parcelableClientInfo.isChosen = true;
+            parcelableClientInfo.isBlocked = false;
             try {
                 data.connection.sendMessage(JSONHelper.createConnectionMessage(UNBLOCK_CODE, "unblock", mServerId));
             } catch (JSONException e) {
@@ -121,15 +127,22 @@ public class Server implements Connection.OnMessageReceivedListener{
 
     public void disconnect(List<ParcelableClientInfo> infoList) {
         for (ParcelableClientInfo info : infoList) {
-            ClientConnectionData data = getConnectionDataById(info.clientId);
+            final ClientConnectionData data = getConnectionDataById(info.clientId);
             ParcelableClientInfo infoForDelete = getClientsInfoById(info.clientId);
             try {
+                data.connection.sendMessage(JSONHelper.createConnectionMessage(UNBLOCK_CODE, "block", mServerId));
                 data.connection.sendMessage(JSONHelper.createServerDisconnect(mServerId));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
             mClientsInfo.remove(infoForDelete);
-            data.connection.closeConnection();
+            Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    data.connection.closeConnection();
+                }
+            }, 2000);
             mClientConnections.remove(data);
         }
         if (mOnClientListChanged != null)

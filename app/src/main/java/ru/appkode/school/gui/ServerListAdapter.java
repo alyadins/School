@@ -60,6 +60,7 @@ public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
         holder.subject.setText(info.subject);
         holder.isConnected.setOnCheckedChangeListener(null);
         holder.isConnected.setChecked(info.isConnected);
+        holder.isConnected.setEnabled(!info.isLocked);
         holder.isConnected.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -71,6 +72,13 @@ public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
                     }
             }
         });
+
+        if (info.isFavourite) {
+            holder.statusImage.setImageResource(R.drawable.remove);
+        } else {
+            holder.statusImage.setImageResource(R.drawable.fav);
+        }
+
         return v;
     }
 

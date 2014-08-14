@@ -31,19 +31,19 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
 
     public interface OnStatusChanged {
-        public void OnStatusChanged(int status, String serverId);
+        public void OnStatusChanged(int status, String serverId, boolean isNeedStatusRefresh);
     }
 
     public interface OnTeacherListChanged {
         public void onTeacherListChanged(ClientConnection connection, List<ParcelableServerInfo> serversInfo);
     }
 
-
-    private Connection mConnection;
-
     private OnTeacherListChanged mOnTeacherListChanged;
     private OnStatusChanged mOnStatusChanged;
     private OnServerInfoDownload mOnServerInfoDownload;
+
+    private ServerConnectionData mFirstConnectionData;
+    private ServerConnectionData mSecondConnectionData;
 
 
     public ClientConnection() {
@@ -68,11 +68,9 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         connectToServer(serverInfo, mClientInfo);
     }
 
-    public void disconnect() {
-        if (mClientInfo == null) {
-            throw  new IllegalArgumentException("client info is null");
-        }
-        disconnectFromServer(mClientInfo);
+    public void disconnect(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
+        Log.d("TEST", "disconnect from " + info.name + " " + info.lastName);
+        disconnectFromServer(info, clientInfo);
     }
 
     public void askForServersInfo(List<NsdServiceInfo> infos) {
@@ -122,20 +120,43 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
 
     public void connectToServer(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
-
+        NsdServiceInfo serviceInfo;
+        ServerConnectionData dataForConnect = getServerById(info.serverId);
         try {
-            if (mConnection != null)
-                mConnection.sendMessage(createClientDisconnect(clientInfo));
-            NsdServiceInfo serviceInfo = getServerById(info.serverId).serviceInfo;
-            mConnection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
-            mConnection.start();
-            mConnection.setOnMessageReceivedListener(this);
-            mConnection.sendMessage(createClientConnect(clientInfo));
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (JSONException e) {
+            if (!clientInfo.isBlocked) {
+                if (mFirstConnectionData != null && !mFirstConnectionData.serverId.equals(info.serverId)) {
+                    sendDisconnect(mFirstConnectionData, clientInfo);
+                }
+                serviceInfo = dataForConnect.serviceInfo;
+                dataForConnect.connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
+                dataForConnect.connection.start();
+                dataForConnect.connection.setOnMessageReceivedListener(this);
+                dataForConnect.connection.sendMessage(createClientConnect(clientInfo));
+                mFirstConnectionData = dataForConnect;
+            } else {
+                if (mSecondConnectionData != null) {
+                    sendDisconnect(mSecondConnectionData, clientInfo);
+                }
+                serviceInfo = dataForConnect.serviceInfo;
+                dataForConnect.connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
+                dataForConnect.connection.start();
+                dataForConnect.connection.setOnMessageReceivedListener(this);
+                dataForConnect.connection.sendMessage(createClientConnect(clientInfo));
+                mSecondConnectionData = dataForConnect;
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private ParcelableServerInfo getServerInfoById(String serverId) {
+        for (ParcelableServerInfo info : mServersInfo) {
+            if (info.serverId.equals(serverId)) {
+                return info;
+            }
+        }
+
+        return null;
     }
 
     private ServerConnectionData getServerById(String serverId) {
@@ -148,13 +169,35 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
     }
 
 
-    public void disconnectFromServer(ParcelableClientInfo clientInfo)  {
-        if (mConnection != null) {
-            try {
-                mConnection.sendMessage(createClientDisconnect(clientInfo));
-            } catch (JSONException e) {
-                e.printStackTrace();
+    public void disconnectFromServer(ParcelableClientInfo clientInfo) {
+        Log.d("TEST", "mFirstconndata null = " + (mFirstConnectionData == null));
+        Log.d("TEST", "mSecondConnectionData null = " + (mSecondConnectionData == null));
+        if (mFirstConnectionData != null) {
+            sendDisconnect(mFirstConnectionData, clientInfo);
+        }
+        if (mSecondConnectionData != null) {
+            sendDisconnect(mSecondConnectionData, clientInfo);
+        }
+    }
+
+    public void disconnectFromServer(ParcelableServerInfo info, ParcelableClientInfo clientInfo)  {
+        ServerConnectionData data = getServerById(info.serverId);
+        if (data == mSecondConnectionData) {
+            mSecondConnectionData = null;
+        }
+        sendDisconnect(data, clientInfo);
+    }
+
+    private void sendDisconnect(ServerConnectionData data, ParcelableClientInfo clientInfo) {
+        try {
+            if (data != null && data.connection != null) {
+                data.connection.sendMessage(createClientDisconnect(clientInfo));
+                if (mOnStatusChanged != null) {
+                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, data.serverId, false);
+                }
             }
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 
@@ -164,16 +207,26 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         Log.d("TEST", message);
         //200
         if (mOnStatusChanged != null) {
+            String serverId = JSONHelper.parseServerId(message);
             switch (code) {
                 case Server.CONNECTED:
-                    mOnStatusChanged.OnStatusChanged(code,JSONHelper.parseServerId(message));
+                    Log.d("CT", "connected to " + serverId);
+                    mOnStatusChanged.OnStatusChanged(code, serverId, true);
                     break;
                 case Server.DISCONNECTED:
-                    mOnStatusChanged.OnStatusChanged(code, JSONHelper.parseServerId(message));
+                    Log.d("CT", "disconnected from " + serverId);
+                    getServerById(serverId).connection.closeConnection();
+                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, serverId, false);
                     break;
-            }
-            if (code / 100 == 5 && mOnStatusChanged != null) {
-                mOnStatusChanged.OnStatusChanged(code, JSONHelper.parseServerId(message));
+                case Server.DISCONNECT:
+                    Log.d("TEST", "delete code");
+                    getServerById(serverId).connection.closeConnection();
+                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, serverId, true);
+                    break;
+                case Server.BLOCK_CODE:
+                case Server.UNBLOCK_CODE:
+                    mOnStatusChanged.OnStatusChanged(code, serverId, true);
+                     break;
             }
         }
         if (code / 100 == 4) {

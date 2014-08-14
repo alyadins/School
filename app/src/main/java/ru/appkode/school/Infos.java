@@ -17,4 +17,9 @@ public class Infos {
     public static final String SERVER_LASTNAME = "server_lastName";
     public static final String SERVER_SECONDNAME = "server_secondName";
     public static final String SERVER_SUBJECT = "server_subject";
+
+    public static final String CLIENT_NAME = "client_name";
+    public static final String CLIENT_LASTNAME = "client_lastName";
+    public static final String CLIENT_GROUP = "client_group";
+    public static final String CLIENT_BLOCKBY = "client_blockBy";
 }

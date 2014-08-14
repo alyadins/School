@@ -17,8 +17,9 @@ public class ParcelableServerInfo implements Parcelable {
     public String lastName;
     public String serverId;
 
-    public boolean isFavourite;
+    public boolean isFavourite = false;
     public boolean isConnected = false;
+    public boolean isLocked = false;
 
     public ParcelableServerInfo() {
     }
@@ -32,10 +33,11 @@ public class ParcelableServerInfo implements Parcelable {
         this.lastName = strings[3];
         this.serverId = strings[4];
 
-        boolean[] booleans = new boolean[2];
+        boolean[] booleans = new boolean[3];
         in.readBooleanArray(booleans);
         this.isFavourite = booleans[0];
         this.isConnected = booleans[1];
+        this.isLocked = booleans[2];
     }
 
 
@@ -61,7 +63,8 @@ public class ParcelableServerInfo implements Parcelable {
                 this.serverId});
         dest.writeBooleanArray(new boolean[] {
                 this.isFavourite,
-                this.isConnected});
+                this.isConnected,
+                this.isLocked});
     }
 
     public static final Parcelable.Creator CREATOR = new Parcelable.Creator() {

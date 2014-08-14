@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">Школа-сервер</string>
+    <string name="app_name">Школа</string>
 
     <!-- Startscreen -->
     <string name="server_teacher">СЕРВЕР \"УЧИТЕЛЬ\"</string>
@@ -49,5 +49,26 @@
 
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>
+
+    <string name="teacher_mode">Режим "УЧИТЕЛЬ"</string>
+
+    <string-array name="default_white_list">
+        <item>AZBUKA</item>
+        <item>Classroom Management Teacher</item>
+        <item>Classroom Management Student</item>
+        <item>Active Textbook</item>
+        <item>SPARKvue</item>
+        <item>ActivEngage 2</item>
+        <item>ЭлЖур Дневник</item>
+        <item>ЕГЭ</item>
+        <item>Nearpod</item>
+        <item>ES проводник</item>
+        <item>Yandex (браузер)</item>
+        <item>Яндекс.Store</item>
+        <item>Галерея</item>
+        <item>Камера</item>
+    </string-array>
+
+    <string name="blocked">Заблокирован</string>
 
 </resources>

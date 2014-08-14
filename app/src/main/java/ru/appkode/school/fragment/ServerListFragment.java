@@ -56,7 +56,6 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
 
     @Override
     public void onClientConnect(ParcelableServerInfo info) {
-        Log.d("TEST", "connect");
         if (mOnServerAction != null) {
             mOnServerAction.onServerAction(info, CONNECT);
         }
@@ -68,5 +67,17 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
 
     public interface OnServerAction {
         public void onServerAction(ParcelableServerInfo info, int action);
+    }
+
+
+    public void setLocked(String serverId, boolean locked) {
+        Log.d("TEST", "lock id = " + serverId + " locked = " + locked);
+        for (ParcelableServerInfo info : mServerList) {
+            if (info.serverId.equals(serverId)) {
+                info.isLocked = locked;
+                break;
+            }
+        }
+        setServerList(mServerList);
     }
 }

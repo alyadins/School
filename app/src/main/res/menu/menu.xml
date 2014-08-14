@@ -6,7 +6,7 @@
         android:id="@+id/refresh"
         android:showAsAction="always"
         android:title="@string/refresh"
-        android:icon="@drawable/ic_launcher"/>
+        android:icon="@drawable/ic_menu_refresh"/>
 
     <item
         android:id="@+id/update"

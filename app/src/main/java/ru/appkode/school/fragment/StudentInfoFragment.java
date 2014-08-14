@@ -68,10 +68,11 @@ public class StudentInfoFragment extends Fragment {
         mIsBlock = block;
 
         if (mStatusTextView != null && mStatusTextView != null) {
-            //TODO add image changing
             if (mIsBlock) {
+                mStatusImageView.setImageResource(R.drawable.lock_big);
                 mStatusTextView.setText(mStatus[1]);
             } else {
+                mStatusImageView.setImageResource(R.drawable.unlock_big);
                 mStatusTextView.setText(mStatus[0]);
             }
         }

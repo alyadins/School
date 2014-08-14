@@ -75,9 +75,11 @@ public class TabsFragment extends Fragment {
         if (mLeftFragment != null && fragment.getId() == mLeftFragment.getId())
             return;
         mLeftFragment = fragment;
-        FragmentTransaction transaction = getFragmentManager().beginTransaction();
-        transaction.add(R.id.left_tab, mLeftFragment, tag);
-        transaction.commit();
+        if (mLeftFragment != null) {
+            FragmentTransaction transaction = getFragmentManager().beginTransaction();
+            transaction.add(R.id.left_tab, mLeftFragment, tag);
+            transaction.commit();
+        }
     }
 
     public void setRightFragment(Fragment fragment, String tag) {
@@ -85,9 +87,11 @@ public class TabsFragment extends Fragment {
         if (mRightFragment != null && fragment.getId() == mRightFragment.getId())
             return;
         mRightFragment = fragment;
-        FragmentTransaction transaction = getFragmentManager().beginTransaction();
-        transaction.add(R.id.right_tab, mRightFragment, tag);
-        transaction.commit();
+        if (mRightFragment != null) {
+            FragmentTransaction transaction = getFragmentManager().beginTransaction();
+            transaction.add(R.id.right_tab, mRightFragment, tag);
+            transaction.commit();
+        }
     }
 
     private void setTitle(String title, int position) {

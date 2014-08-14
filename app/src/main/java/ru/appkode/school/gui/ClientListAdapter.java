@@ -53,6 +53,12 @@ public class ClientListAdapter extends ArrayAdapter<ParcelableClientInfo> {
         final ParcelableClientInfo clientInfo = mClientsInfo.get(position);
         holder.group.setText(clientInfo.group);
         holder.name.setText(clientInfo.name + " " + clientInfo.lastName);
+        Log.d("TEST", "adapter client info blocked = " + clientInfo.isBlocked);
+        if (clientInfo.isBlocked) {
+            holder.lockImage.setImageResource(R.drawable.lock_small);
+        } else {
+            holder.lockImage.setImageResource(R.drawable.unlock_small);
+        }
 
         if (clientInfo.isBlockedByOther) {
             holder.otherBlock.setVisibility(View.VISIBLE);
@@ -67,6 +73,7 @@ public class ClientListAdapter extends ArrayAdapter<ParcelableClientInfo> {
             }
         });
         holder.isSelected.setChecked(clientInfo.isChosen);
+
 
         return v;
     }

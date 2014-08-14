@@ -10,6 +10,7 @@ import ru.appkode.school.network.Connection;
 public class ServerConnectionData {
     public String serverId;
     public NsdServiceInfo serviceInfo;
+    public Connection connection;
 
     public ServerConnectionData(String serverId, NsdServiceInfo serviceInfo) {
         this.serverId = serverId;

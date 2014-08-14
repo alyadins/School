@@ -2,9 +2,11 @@ package ru.appkode.school.service;
 
 import android.app.Notification;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
+import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
@@ -25,6 +27,7 @@ import ru.appkode.school.network.Server;
  */
 public class ServerService extends Service implements Server.OnClientListChanged {
 
+    public static final int NOTIF_ID = 245;
     public static final String ACTION = "action";
 
     public static final String IS_RUN_PREF = "is_run_pref";
@@ -73,7 +76,17 @@ public class ServerService extends Service implements Server.OnClientListChanged
         mServer.start();
         mServer.setOnClientListChangedListener(this);
         mIsRunning = false;
+        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        WifiManager.WifiLock lock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LockTag");
+        lock.acquire();
+
+        this.startForeground();
     }
+
+    private void startForeground() {
+        startForeground(NOTIF_ID, getNotification());
+    }
+
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -90,12 +103,6 @@ public class ServerService extends Service implements Server.OnClientListChanged
             Log.d("TEST", "action = " + command);
             runAction(command, intent);
         }
-        Notification.Builder builder = new Notification.Builder(getApplicationContext());
-        builder.setSmallIcon(R.drawable.ic_launcher);
-        builder.setContentText("content text");
-        builder.setWhen(System.currentTimeMillis());
-        builder.setContentTitle("title");
-        startForeground(1, builder.build());
         return START_STICKY;
     }
 
@@ -223,9 +230,6 @@ public class ServerService extends Service implements Server.OnClientListChanged
     }
 
     private void actionStatus() {
-        Log.d("TEST", "isRunning " + mIsRunning + " status");
-    //    while (!mIsRunning) {};
-        Log.d("TEST", "create status intent");
         Intent intent = new Intent(BROADCAST_ACTION);
         intent.putExtra(CODE, STATUS);
         if (mServerInfo != null && mServer != null) {
@@ -235,13 +239,13 @@ public class ServerService extends Service implements Server.OnClientListChanged
         } else {
             intent.putExtra(IS_INIT, false);
         }
-        Log.d("TEST", "send status");
+
         sendStickyBroadcast(intent);
     }
 
     @Override
     public void onClientListChanged(ArrayList<ParcelableClientInfo> clientsInfo) {
-        sendBroadCastClientsList(clientsInfo);
+        actionStatus();
     }
 
     private void sendBroadCastClientsList(ArrayList<ParcelableClientInfo> clientsInfo) {
@@ -293,21 +297,15 @@ public class ServerService extends Service implements Server.OnClientListChanged
         Log.d("TEST", "sp writed");
     }
 
-//    private boolean readRunningStatus() {
-//        SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
-//        boolean isRunning = preferences.getBoolean(IS_RUN_PREF, false);
-//        Log.d("TEST", "read runnging status " + isRunning);
-//
-//        return isRunning;
-//    }
-//
-//    private void writeRunningStatus() {
-//        Log.d("TEST", "write running status " + mIsRunning);
-//        SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
-//        SharedPreferences.Editor editor = preferences.edit();
-//        editor.putBoolean(IS_RUN_PREF, mIsRunning);
-//        editor.commit();
-//    }
+
+    private Notification getNotification() {
+        return new Notification.Builder(this)
+                .setSmallIcon(R.drawable.app_icon)
+                .setContentText(getString(R.string.teacher_mode))
+                .setWhen(System.currentTimeMillis())
+                .setContentTitle(getString(R.string.app_name))
+                .build();
+    }
 
 
     @Override

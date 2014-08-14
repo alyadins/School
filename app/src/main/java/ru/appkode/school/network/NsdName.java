@@ -129,21 +129,25 @@ public class NsdName{
         mDiscoveryListener = new NsdManager.DiscoveryListener() {
             @Override
             public void onStartDiscoveryFailed(String serviceType, int errorCode) {
+                Log.d("TEST", "discovery start fail code = " + errorCode);
                 mIsDiscoveryStarted = false;
             }
 
             @Override
             public void onStopDiscoveryFailed(String serviceType, int errorCode) {
+                Log.d("TEST", "discovery stop fail code = " + errorCode);
                 mIsDiscoveryStarted = false;
             }
 
             @Override
             public void onDiscoveryStarted(String serviceType) {
+                Log.d("TEST", "discovery started");
                 mIsDiscoveryStarted = true;
             }
 
             @Override
             public void onDiscoveryStopped(String serviceType) {
+                Log.d("TEST", "discovery stoped");
                 mIsDiscoveryStarted = false;
             }
 

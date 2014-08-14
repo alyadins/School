@@ -10,6 +10,8 @@ import android.view.View;
 
 import ru.appkode.school.Infos;
 import ru.appkode.school.R;
+import ru.appkode.school.service.ClientService;
+import ru.appkode.school.service.ServerService;
 import ru.appkode.school.util.ServiceType;
 
 import static ru.appkode.school.util.ServiceType.*;
@@ -24,12 +26,16 @@ public class StartActivity extends Activity {
     }
 
     private void startClientActivity() {
+        Intent stopIntent = new Intent(StartActivity.this, ServerService.class);
+        stopService(stopIntent);
         Intent intent = new Intent(StartActivity.this, StudentActivity.class);
         startActivity(intent);
         finish();
     }
 
     private void startTeacherActivity() {
+        Intent stopIntent = new Intent(StartActivity.this, ClientService.class);
+        stopService(stopIntent);
         Intent intent = new Intent(StartActivity.this, TeacherActivity.class);
         startActivity(intent);
         finish();
