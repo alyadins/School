@@ -19,6 +19,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
 import ru.appkode.school.service.ClientService;
+import ru.appkode.school.util.RegExpTestUtil;
 import ru.appkode.school.util.StringUtil;
 
 import static ru.appkode.school.service.ClientService.*;
@@ -41,7 +43,8 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 /**
  * Created by lexer on 01.08.14.
  */
-public class StudentActivity extends Activity implements ServerListFragment.OnServerAction {
+public class StudentActivity extends Activity implements ServerListFragment.OnServerAction, StudentInfoFragment.OnShowApps {
+
 
     //fragments
     private FragmentManager mFragmentManager;
@@ -51,7 +54,6 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
 
     //data
     private List<ParcelableServerInfo> mServersInfo;
-    private ParcelableServerInfo mCurrentServer;
     private ParcelableClientInfo mClientInfo;
 
     private AlertDialog mLoginDialog;
@@ -63,25 +65,12 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_student);
 
-        Intent intent = new Intent(StudentActivity.this, ClientService.class);
-        intent.putExtra(ACTION, STATUS);
-        startService(intent);
-
-        Intent lockIntent = getIntent();
-        boolean showLockDialog = lockIntent.getBooleanExtra(ClientService.SHOW_BLOCK_DIALOG, false);
-        if (showLockDialog) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            String message = getResources().getStringArray(R.array.status)[1];
-            builder.setMessage(message)
-                    .setPositiveButton(R.string.ok, null)
-                    .show();
-        }
-
         mFragmentManager = getFragmentManager();
         mStudentInfoFragment = (StudentInfoFragment) mFragmentManager.findFragmentByTag(StudentInfoFragment.TAG);
 
         if (mStudentInfoFragment == null) {
             mStudentInfoFragment = new StudentInfoFragment();
+            mStudentInfoFragment.setOnShowAppsListener(this);
             FragmentTransaction transaction = mFragmentManager.beginTransaction();
             transaction.add(R.id.user_info, mStudentInfoFragment, StudentInfoFragment.TAG);
             transaction.commit();
@@ -147,14 +136,9 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                 mWaitDialog.show();
                 break;
             case R.id.about:
-                Log.d("TEST", "clear sp");
-                SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
-                SharedPreferences.Editor editor = preferences.edit();
-                editor.clear();
-                editor.commit();
                 break;
             case R.id.change_username:
-                showStudentLoginDialog();
+                sendCommandToService(CHANGE_NAME, null);
                 break;
         }
         return super.onOptionsItemSelected(item);
@@ -177,10 +161,16 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         }
     }
 
-    private void showStudentLoginDialog() {
+    private void showStudentLoginDialog(ParcelableClientInfo info) {
         LayoutInflater inflater = getLayoutInflater();
         final View v = inflater.inflate(R.layout.student_login_dialog, null);
         View titleView = inflater.inflate(R.layout.student_login_dialog_title, null);
+
+        if (info != null) {
+            ((EditText) v.findViewById(R.id.name)).setText(info.name);
+            ((EditText) v.findViewById(R.id.last_name)).setText(info.lastName);
+            ((EditText) v.findViewById(R.id.group)).setText(info.group);
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setCustomTitle(titleView)
@@ -189,6 +179,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                 .setNegativeButton(R.string.cancel, null);
 
         mLoginDialog = builder.create();
+        Log.d("TEST", "show");
         mLoginDialog.show();
 
         mLoginDialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
@@ -209,8 +200,14 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                 checkForEmpty(this, lastName, R.string.error_enter_last_name) ||
                 checkForEmpty(this, group, R.string.error_enter_group))
             return;
+        if (!RegExpTestUtil.check(name, RegExpTestUtil.NAME) ||
+                !RegExpTestUtil.check(lastName, RegExpTestUtil.NAME) ||
+                !RegExpTestUtil.check(group, RegExpTestUtil.GROUP)) {
+            Toast.makeText(this, R.string.error_incorrect_data, Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        String clientId = "client" + StringUtil.md5(name + lastName + group);
+        String clientId = "client" + StringUtil.md5((name + lastName + group).toLowerCase());
         boolean block = false;
         String blockBy = "none";
         if (mClientInfo != null) {
@@ -265,6 +262,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         break;
                     case STATUS:
                         boolean isInit = intent.getBooleanExtra(IS_INIT, false);
+                        Log.d("TEST", "is init = " + isInit);
                         if (isInit) {
                             mClientInfo = intent.getParcelableExtra(NAME);
                             mServersInfo = intent.getParcelableArrayListExtra(NAMES);
@@ -272,10 +270,29 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                             mServerListFragment.setServerList(mServersInfo);
                             mStudentInfoFragment.setBlock(mClientInfo.isBlocked);
                         } else {
-                            Log.d("TEST", "show student login dialog");
-                            showStudentLoginDialog();
+                            showStudentLoginDialog(null);
                         }
                         break;
+                    case CHANGE_NAME:
+                        boolean isNameInit = intent.getBooleanExtra(IS_INIT, false);
+                        if (isNameInit) {
+                            ParcelableClientInfo info = intent.getParcelableExtra(NAME);
+                            showStudentLoginDialog(info);
+                        } else {
+                            showStudentLoginDialog(null);
+                        }
+                        break;
+                    case WHITE_LIST:
+                        boolean isWhiteListInit = intent.getBooleanExtra(IS_INIT, false);
+                        if (isWhiteListInit) {
+                            ArrayList<String> whiteList = intent.getStringArrayListExtra(WHITE_LIST_PARAM);
+                            startAppsActivity(whiteList);
+                        } else {
+                            AlertDialog.Builder builder = new AlertDialog.Builder(StudentActivity.this);
+                            builder.setMessage(R.string.apps_activity_error);
+                            builder.setPositiveButton(R.string.ok, null);
+                            builder.show();
+                        }
                 }
             }
         };
@@ -284,12 +301,19 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         registerReceiver(mBroadcastReceiver, filter);
     }
 
+
     private void sendCommandToService(int action, ParcelableClientInfo info) {
         Intent intent = new Intent(StudentActivity.this, ClientService.class);
         intent.putExtra(ACTION, action);
         if (info != null)
             intent.putExtra(NAME, info);
         startService(intent);
+    }
+
+    private void startAppsActivity(ArrayList<String> whiteList) {
+        Intent appsIntent = new Intent(StudentActivity.this, AppActivity.class);
+        appsIntent.putStringArrayListExtra(WHITE_LIST_PARAM, whiteList);
+        startActivity(appsIntent);
     }
 
     private void sendConnectCommandToService(int action, ParcelableServerInfo info) {
@@ -304,5 +328,10 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         mStudentInfoFragment.setUserName(mClientInfo.name + " " + mClientInfo.lastName);
         mStudentInfoFragment.setGroup(mClientInfo.group);
         mStudentInfoFragment.setBlock(mClientInfo.isBlocked);
+    }
+
+    @Override
+    public void onShowApps() {
+        sendCommandToService(WHITE_LIST, null);
     }
 }

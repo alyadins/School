@@ -55,9 +55,21 @@ public class JSONHelper {
         return json.toString();
     }
 
-    public static String createWhiteListJson(List<String> whiteList) {
+    public static String createAppListJson(List<String> whiteList) {
         JSONArray array = new JSONArray(whiteList);
         return array.toString();
+    }
+
+    public static String createBlockJson(String serverId, List<String> whiteList, List<String> blackList) throws JSONException {
+        JSONObject json = new JSONObject();
+        json.put("code", Server.BLOCK_CODE);
+        json.put("server_id", serverId);
+        JSONArray whiteListJson = new JSONArray(whiteList);
+        json.put("white_list", whiteListJson);
+        JSONArray blackListJson = new JSONArray(blackList);
+        json.put("black_list", blackListJson);
+
+        return json.toString();
     }
 
     /*
@@ -145,14 +157,23 @@ public class JSONHelper {
         return json.getString("server_id");
     }
 
-    public static List<String> parseWhiteList(String result) throws JSONException {
-        List<String> whiteList = new ArrayList<String>();
-        JSONArray appArray = new JSONArray(result);
+    public static ArrayList<String> parseList(String message, String name) throws JSONException {
+        JSONObject json = new JSONObject(message);
+        JSONArray array = json.getJSONArray(name);
+        return parseAppList(array);
+    }
 
-        for (int i = 0; i < appArray.length(); i++) {
-            whiteList.add(appArray.getString(i));
+    public static ArrayList<String> parseAppList(String result) throws JSONException {
+        JSONArray array = new JSONArray(result);
+        return parseAppList(array);
+    }
+
+    private static ArrayList<String> parseAppList(JSONArray array) throws JSONException {
+        ArrayList<String> list = new ArrayList<String>();
+        for (int i = 0; i < array.length(); i++) {
+            list.add(array.getString(i));
         }
 
-        return whiteList;
+        return list;
     }
 }

@@ -76,4 +76,12 @@ public class ParcelableServerInfo implements Parcelable {
             return new ParcelableServerInfo[size];
         }
     };
+
+    public boolean isInit() {
+        if (name != null && secondName != null && lastName != null && subject != null && serverId != null) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }

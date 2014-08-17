@@ -15,6 +15,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -117,10 +118,11 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 intent = new Intent(TeacherActivity.this, ServerService.class);
                 intent.putExtra(ACTION, STOP);
                 startService(intent);
-                showTeacherLoginDialog();
+                intent = new Intent(TeacherActivity.this, ServerService.class);
+                intent.putExtra(ACTION, CLIENTS_CONNECTED);
+                startService(intent);
                 break;
             case R.id.about:
-                Log.d("TEST", "clear sp");
                 SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
                 SharedPreferences.Editor editor = preferences.edit();
                 editor.clear();
@@ -131,8 +133,15 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
     }
 
 
-    private void showTeacherLoginDialog() {
+    private void showTeacherLoginDialog(ParcelableServerInfo info) {
         final View v = getLayoutInflater().inflate(R.layout.teacher_login_dialog, null);
+
+        if (info != null) {
+            ((EditText) v.findViewById(R.id.last_name)).setText(info.lastName);
+            ((EditText) v.findViewById(R.id.name)).setText(info.name);
+            ((EditText) v.findViewById(R.id.second_name)).setText(info.secondName);
+            ((EditText) v.findViewById(R.id.subject)).setText(info.subject);
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.enter_user_name)
@@ -169,20 +178,16 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
 
         StringBuffer buffer = new StringBuffer();
         buffer.append(mServerInfo.name)
-                .append(" ")
                 .append(mServerInfo.secondName)
-                .append(" ")
                 .append(mServerInfo.lastName)
-                .append(" ")
                 .append(mServerInfo.subject);
 
-        mServerInfo.serverId = "serv" + StringUtil.md5(buffer.toString());
+        mServerInfo.serverId = "serv" + StringUtil.md5(buffer.toString().toLowerCase());
 
-
-        Intent intent = new Intent(TeacherActivity.this, ServerService.class);
-        intent.putExtra(ACTION, IS_NAME_FREE);
-        intent.putExtra(NAME, mServerInfo);
-        startService(intent);
+        Intent nameIntent = new Intent(TeacherActivity.this, ServerService.class);
+        nameIntent.putExtra(ACTION, IS_NAME_FREE);
+        nameIntent.putExtra(NAME, mServerInfo);
+        startService(nameIntent);
     }
 
     private void setTeacherInfo() {
@@ -228,7 +233,7 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                         if (isFree) {
                             mDialog.dismiss();
                             sendCommandToService(START, mServerInfo);
-                            sendCommandToService(STATUS, null);
+                          //  sendCommandToService(STATUS, null);
                         } else {
                             Toast.makeText(TeacherActivity.this, "Занято", Toast.LENGTH_LONG).show();
                         }
@@ -248,7 +253,6 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                         Log.d("TEST", "deleted");
                         break;
                     case STATUS:
-                        Log.d("TEST", "status");
                         boolean isInit = intent.getBooleanExtra(IS_INIT, false);
                         if (isInit) {
                             mServerInfo = intent.getParcelableExtra(NAME);
@@ -256,9 +260,29 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                             mClientListFragment.setClients(i);
                             setTeacherInfo();
                         } else {
-                            showTeacherLoginDialog();
+                            showTeacherLoginDialog(null);
                         }
                         break;
+                    case CLIENTS_CONNECTED:
+                        boolean isClientsConnected = intent.getBooleanExtra(IS_CLIENTS_CONNECTED, false);
+                        if (isClientsConnected) {
+                            AlertDialog.Builder builder = new AlertDialog.Builder(TeacherActivity.this);
+                            builder.setMessage(R.string.clients_connected)
+                                    .setTitle(R.string.error)
+                                    .setPositiveButton(R.string.ok, null)
+                                    .show();
+                        } else {
+                            sendCommandToService(CHANGE_NAME, null);
+                        }
+                        break;
+                    case CHANGE_NAME:
+                        boolean isNameInit = intent.getBooleanExtra(IS_INIT, false);
+                        if (isNameInit) {
+                            ParcelableServerInfo info = intent.getParcelableExtra(NAME);
+                            showTeacherLoginDialog(info);
+                        } else {
+                            showTeacherLoginDialog(null);
+                        }
                 }
             }
         };
@@ -270,7 +294,9 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
 
     private void sendCommandToService(int action, ParcelableServerInfo name) {
         Intent intent = new Intent(TeacherActivity.this, ServerService.class);
-        intent.putExtra(NAME, name);
+        if (name != null) {
+            intent.putExtra(NAME, name);
+        }
         intent.putExtra(ACTION, action);
         startService(intent);
     }

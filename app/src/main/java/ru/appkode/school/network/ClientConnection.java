@@ -31,7 +31,7 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
 
     public interface OnStatusChanged {
-        public void OnStatusChanged(int status, String serverId, boolean isNeedStatusRefresh);
+        public void OnStatusChanged(int status, String serverId, boolean isNeedStatusRefresh, ArrayList<String>[] lists);
     }
 
     public interface OnTeacherListChanged {
@@ -85,7 +85,7 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         return mServersInfo;
     }
 
-    private void askForServerInfo(final NsdServiceInfo serviceInfo) {
+    public void askForServerInfo(final NsdServiceInfo serviceInfo) {
         try {
             Log.d("TEST", "ask info from " + serviceInfo.getHost() + " " + serviceInfo.getPort());
             Connection connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
@@ -118,6 +118,15 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         }
     }
 
+//    public void removeServer(NsdServiceInfo serviceInfo) {
+//        String id = serviceInfo.getServiceName();
+//        mServers.remove(getServerById(id));
+//        mServersInfo.remove(getServerInfoById(id));
+//        if (mOnStatusChanged != null) {
+//            mOnStatusChanged.OnStatusChanged();
+//        }
+//    }
+
 
     public void connectToServer(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
         NsdServiceInfo serviceInfo;
@@ -149,6 +158,15 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         }
     }
 
+    private ServerConnectionData getServerById(String serverId) {
+        for (ServerConnectionData data : mServers) {
+            if (data.serverId.equals(serverId)) {
+                return data;
+            }
+        }
+        return null;
+    }
+
     private ParcelableServerInfo getServerInfoById(String serverId) {
         for (ParcelableServerInfo info : mServersInfo) {
             if (info.serverId.equals(serverId)) {
@@ -156,15 +174,6 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
             }
         }
 
-        return null;
-    }
-
-    private ServerConnectionData getServerById(String serverId) {
-        for (ServerConnectionData data : mServers) {
-            if (data.serverId.equals(serverId)) {
-                return data;
-            }
-        }
         return null;
     }
 
@@ -193,7 +202,7 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
             if (data != null && data.connection != null) {
                 data.connection.sendMessage(createClientDisconnect(clientInfo));
                 if (mOnStatusChanged != null) {
-                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, data.serverId, false);
+                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, data.serverId, false, null);
                 }
             }
         } catch (JSONException e) {
@@ -204,28 +213,33 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
     @Override
     public void onReceiveMessage(Connection connection, String message) throws JSONException {
         int code =  JSONHelper.parseCode(message);
-        Log.d("TEST", message);
+        Log.d("CLIENT_MESSAGE", message);
         //200
         if (mOnStatusChanged != null) {
             String serverId = JSONHelper.parseServerId(message);
             switch (code) {
                 case Server.CONNECTED:
                     Log.d("CT", "connected to " + serverId);
-                    mOnStatusChanged.OnStatusChanged(code, serverId, true);
+                    mOnStatusChanged.OnStatusChanged(code, serverId, true, null);
                     break;
                 case Server.DISCONNECTED:
                     Log.d("CT", "disconnected from " + serverId);
                     getServerById(serverId).connection.closeConnection();
-                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, serverId, false);
+                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, serverId, false, null);
                     break;
                 case Server.DISCONNECT:
                     Log.d("TEST", "delete code");
                     getServerById(serverId).connection.closeConnection();
-                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, serverId, true);
+                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECTED, serverId, true, null);
                     break;
                 case Server.BLOCK_CODE:
+                    ArrayList[] lists = new ArrayList[2];
+                    lists[0] = JSONHelper.parseList(message, "white_list");
+                    lists[1] = JSONHelper.parseList(message, "black_list");
+                    mOnStatusChanged.OnStatusChanged(Server.BLOCK_CODE, serverId, true, lists);
+                    break;
                 case Server.UNBLOCK_CODE:
-                    mOnStatusChanged.OnStatusChanged(code, serverId, true);
+                    mOnStatusChanged.OnStatusChanged(code, serverId, true, null);
                      break;
             }
         }

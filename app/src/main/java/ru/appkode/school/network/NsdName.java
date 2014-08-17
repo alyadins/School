@@ -22,7 +22,14 @@ public class NsdName{
     public static final int CLIENT = 1;
     private static final int UNKNOWN = 2;
 
+    public static final int FOUND = 0;
+    public static final int LOST = 1;
+
     private static final int CAPACITY = 50;
+
+    public interface OnServerStatusChanged {
+        public void onServerStatusChanged(NsdServiceInfo nsdServiceInfo, int status);
+    }
 
     private NsdManager mManager;
 
@@ -35,6 +42,7 @@ public class NsdName{
 
     private NsdManager.DiscoveryListener mDiscoveryListener;
     private NsdManager.ResolveListener mResolveListener;
+    private OnServerStatusChanged mOnServerStatusChanged;
 
     private int mType;
 
@@ -61,9 +69,9 @@ public class NsdName{
         return mIsDiscoveryStarted;
     }
 
-    public boolean isNameFree(String name) {
+    public boolean isNameFree(String name, String currentId) {
         for (NsdServiceInfo si : mDiscoveredServices) {
-            if (si.getServiceName().equals(name)) {
+            if (si.getServiceName().equals(name) && !si.getServiceName().equals(currentId)) {
                 return false;
             }
         }
@@ -169,9 +177,11 @@ public class NsdName{
 
             @Override
             public void onServiceLost(NsdServiceInfo serviceInfo) {
-                Log.d("TEST", "lost " + serviceInfo.getServiceName());
                 removeDiscoveredService(serviceInfo);
                 removeResolvedService(serviceInfo);
+                if (mOnServerStatusChanged != null) {
+                    mOnServerStatusChanged.onServerStatusChanged(serviceInfo, LOST);
+                }
             }
         };
     }
@@ -191,8 +201,10 @@ public class NsdName{
             @Override
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
                 resolveNext();
-                Log.d("TEST", "resolved " + serviceInfo.getServiceName());
                 mResolvedServices.add(serviceInfo);
+                if (mOnServerStatusChanged != null) {
+                    mOnServerStatusChanged.onServerStatusChanged(serviceInfo, FOUND);
+                }
             }
         };
     }
@@ -209,4 +221,8 @@ public class NsdName{
         }
     }
 
+
+    public void setOnServerStatusChangedListener(OnServerStatusChanged l) {
+        mOnServerStatusChanged = l;
+    }
 }

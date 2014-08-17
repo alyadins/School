@@ -70,4 +70,12 @@ public class ParcelableClientInfo implements Parcelable {
             return new ParcelableClientInfo[size];
         }
     };
+
+    public boolean isInit() {
+        if (name != null && lastName != null && group != null && blockedBy != null && clientId != null) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }

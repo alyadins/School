@@ -38,6 +38,8 @@
             android:screenOrientation="landscape"/>
         <activity android:name=".activity.BlockActivity"
                   />
+        <activity android:name=".activity.AppActivity"
+            android:screenOrientation="landscape"/>
         <service android:name=".service.ClientService"
             android:process=":clientService"/>
         <service android:name=".service.ServerService"

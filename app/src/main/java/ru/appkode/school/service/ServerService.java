@@ -1,6 +1,7 @@
 package ru.appkode.school.service;
 
 import android.app.Notification;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -16,11 +17,15 @@ import java.util.List;
 
 import ru.appkode.school.Infos;
 import ru.appkode.school.R;
+import ru.appkode.school.activity.StudentActivity;
+import ru.appkode.school.activity.TeacherActivity;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
 import ru.appkode.school.network.NsdName;
 import ru.appkode.school.network.NsdRegistration;
 import ru.appkode.school.network.Server;
+import ru.appkode.school.util.AppListHelper;
+import ru.appkode.school.util.ServerSharedPreferences;
 
 /**
  * Created by lexer on 10.08.14.
@@ -30,17 +35,17 @@ public class ServerService extends Service implements Server.OnClientListChanged
     public static final int NOTIF_ID = 245;
     public static final String ACTION = "action";
 
-    public static final String IS_RUN_PREF = "is_run_pref";
-
     //Actions
     public static final int START = 0;
     public static final int IS_NAME_FREE = 1;
     public static final int STOP = 2;
+    public static final int CLIENTS_CONNECTED = 3;
     public static final int BLOCK = 4;
     public static final int UNBLOCK = 5;
     public static final int DELETE = 6;
     public static final int GET_CLIENTS = 7;
     public static final int STATUS = 8;
+    public static final int CHANGE_NAME = 9;
 
 
     //params
@@ -50,6 +55,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
     //Answers
     public static final String CODE = "code";
     public static final String MESSAGE = "message";
+    public static final String IS_CLIENTS_CONNECTED = "isClientsConnected";
     public static final String IS_INIT = "is_init";
 
     public static final String BROADCAST_ACTION = "ru.appkode.school.serverbroadcast";
@@ -57,29 +63,37 @@ public class ServerService extends Service implements Server.OnClientListChanged
     private NsdManager mManager;
     private NsdRegistration mNsdRegistration;
     private NsdName mNsdName;
+    private ServerSharedPreferences mSharedPreferences;
 
     private Server mServer;
     private ParcelableServerInfo mServerInfo;
 
-    private boolean mIsRunning;
+    private AppListHelper mAppListHelper;
+    private List<String> mWhiteList;
+    private List<String> mBlackList;
+
     private boolean mIsFirstLaunch = true;
 
     @Override
     public void onCreate() {
-        Log.d("TEST", "on create");
         super.onCreate();
         mManager = (NsdManager) getSystemService(NSD_SERVICE);
         mNsdRegistration = new NsdRegistration(mManager);
         mNsdName = new NsdName(mManager, NsdName.SERVER);
         mNsdName.start();
+        mSharedPreferences = new ServerSharedPreferences(this);
         mServer = new Server();
         mServer.start();
         mServer.setOnClientListChangedListener(this);
-        mIsRunning = false;
         WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         WifiManager.WifiLock lock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LockTag");
         lock.acquire();
 
+        mServerInfo = new ParcelableServerInfo();
+
+        mAppListHelper = new AppListHelper(this);
+        mWhiteList = mAppListHelper.getList(AppListHelper.WHITE_LIST);
+        mBlackList = mAppListHelper.getList(AppListHelper.BLACK_LIST);
         this.startForeground();
     }
 
@@ -90,17 +104,17 @@ public class ServerService extends Service implements Server.OnClientListChanged
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d("TEST", "on start mIsRunnging = " +mIsRunning);
         if (mIsFirstLaunch) {
-            if (checkSharedPreferences()) {
-                Log.d("TEST", "start from shared pref");
+            Log.d("sharedPreferences", "check SP on start");
+            if (mSharedPreferences.checkSharedPreferences(mServerInfo)) {
+                Log.d("sharedPreferences", "onStart  id = " + mServerInfo.serverId + " name = " + mServerInfo.name);
                 actionStart(mServerInfo);
             }
             mIsFirstLaunch = false;
         }
+
         if (intent != null) {
             int command = intent.getIntExtra(ACTION, -1);
-            Log.d("TEST", "action = " + command);
             runAction(command, intent);
         }
         return START_STICKY;
@@ -113,7 +127,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
     }
 
     private void runAction(int action, Intent intent) {
-        if (action <= STOP) {
+        if (action <= IS_NAME_FREE) {
             ParcelableServerInfo info = intent.getParcelableExtra(NAME);
             switch (action) {
                 case START:
@@ -122,9 +136,6 @@ public class ServerService extends Service implements Server.OnClientListChanged
                     break;
                 case IS_NAME_FREE:
                     actionIsNameFree(info);
-                    break;
-                case STOP:
-                    actionStop();
                     break;
             }
         } else if (action >= BLOCK && action <= DELETE){
@@ -140,28 +151,40 @@ public class ServerService extends Service implements Server.OnClientListChanged
                     actionDelete(names);
                     break;
             }
-        } else if (action == GET_CLIENTS) {
-            actionGetClients();
-        } else if (action == STATUS) {
-            actionStatus();
+        } else switch (action) {
+            case GET_CLIENTS:
+                actionGetClients();
+                break;
+            case STOP:
+                actionStop();
+                break;
+            case STATUS:
+                actionStatus();
+                break;
+            case CLIENTS_CONNECTED:
+                actionClientsConnected();
+                break;
+            case CHANGE_NAME:
+                actionChangeName();
         }
     }
 
     //Actions methods
     private void actionStart(ParcelableServerInfo info) {
-        Log.d("TEST", "on start is registered" + mNsdRegistration.isRegistered());
+        mServerInfo = info;
         if (!mNsdRegistration.isRegistered()) {
             startService(info);
         } else {
             mNsdRegistration.stop();
             while (mNsdRegistration.isRegistered()) {}
+            mServer.disconnectAllClients();
             startService(info);
         }
     }
 
     private void startService(ParcelableServerInfo info) {
         Log.d("TEST", "start service " + info.name + " " + info.lastName);
-        writeSharedPreferences(info);
+        mSharedPreferences.writeSharedPreferences(info);
         mServer.setServerInfo(info);
         while (mServer.getPort() == -1) {}//Wait start server
         int port = mServer.getPort();
@@ -171,12 +194,10 @@ public class ServerService extends Service implements Server.OnClientListChanged
         mNsdRegistration.start();
 
 
-        mIsRunning = true;
         sendSimpleBroadCast(START, "started");
     }
 
     private void actionIsNameFree(final ParcelableServerInfo info) {
-        Log.d("TEST", "is name free");
         for (int i = 0; i < 10; i++) {
             if (!mNsdName.isDiscoveryStarted()) {
                 try {
@@ -195,7 +216,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                boolean isNameFree = mNsdName.isNameFree(info.serverId);
+                boolean isNameFree = mNsdName.isNameFree(info.serverId, mServerInfo.serverId);
                 Intent intent = new Intent(BROADCAST_ACTION);
                 intent.putExtra(CODE, IS_NAME_FREE);
                 intent.putExtra(MESSAGE, isNameFree);
@@ -206,12 +227,11 @@ public class ServerService extends Service implements Server.OnClientListChanged
 
     private void actionStop() {
         mNsdRegistration.stop();
-        mIsRunning = false;
         sendSimpleBroadCast(STOP, "stop");
     }
 
     private void actionBlock(List<ParcelableClientInfo> names) {
-        mServer.block(names);
+        mServer.block(names, mWhiteList, mBlackList);
         sendSimpleBroadCast(BLOCK, "blocked");
     }
 
@@ -232,7 +252,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
     private void actionStatus() {
         Intent intent = new Intent(BROADCAST_ACTION);
         intent.putExtra(CODE, STATUS);
-        if (mServerInfo != null && mServer != null) {
+        if (mServerInfo != null && mServerInfo.isInit() && mServer != null) {
             intent.putExtra(IS_INIT, true);
             intent.putExtra(NAME, mServerInfo);
             intent.putExtra(NAMES, mServer.getClientsInfo());
@@ -241,6 +261,26 @@ public class ServerService extends Service implements Server.OnClientListChanged
         }
 
         sendStickyBroadcast(intent);
+    }
+
+    private void actionClientsConnected() {
+        Intent intent = new Intent(BROADCAST_ACTION);
+        intent.putExtra(CODE, CLIENTS_CONNECTED);
+        intent.putExtra(IS_CLIENTS_CONNECTED, mServer.getClientsInfo().size() > 0);
+        sendBroadcast(intent);
+    }
+
+    private void actionChangeName() {
+        Intent intent = new Intent(BROADCAST_ACTION);
+        intent.putExtra(CODE, CHANGE_NAME);
+        if (mServerInfo != null && mServerInfo.isInit()) {
+            intent.putExtra(IS_INIT, true);
+            intent.putExtra(NAME, mServerInfo);
+        } else {
+            intent.putExtra(IS_INIT, false);
+        }
+
+        sendBroadcast(intent);
     }
 
     @Override
@@ -262,48 +302,15 @@ public class ServerService extends Service implements Server.OnClientListChanged
     }
 
 
-    private boolean checkSharedPreferences() {
-        Log.d("TEST", "check sp");
-        SharedPreferences preferences = getApplicationContext().getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
-        String id = preferences.getString(Infos.ID, "none");
-        if (id.substring(0, 4).equals("serv")) {
-            String name = preferences.getString(Infos.SERVER_NAME, "name");
-            String secondName = preferences.getString(Infos.SERVER_SECONDNAME, "second_name");
-            String lastName = preferences.getString(Infos.SERVER_LASTNAME, "last_name");
-            String subject = preferences.getString(Infos.SERVER_SUBJECT, "subject");
-            Log.d("TEST", "sp readed " + name + " " + secondName + " " + lastName + " " + subject);
-            if (name.equals("name") || secondName.equals("second_name") || lastName.equals("last_name") || subject.equals("subject")) {
-                return false;
-            } else {
-                mServerInfo = new ParcelableServerInfo(lastName, name, secondName, subject);
-                mServerInfo.serverId = id;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void writeSharedPreferences(ParcelableServerInfo info) {
-        SharedPreferences preferences = getApplicationContext().getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        editor.putString(Infos.ID, info.serverId);
-        editor.putString(Infos.SERVER_NAME, info.name);
-        editor.putString(Infos.SERVER_SECONDNAME, info.secondName);
-        editor.putString(Infos.SERVER_LASTNAME, info.lastName);
-        editor.putString(Infos.SERVER_SUBJECT, info.subject);
-        editor.commit();
-
-        Log.d("TEST", "sp writed");
-    }
-
-
     private Notification getNotification() {
+        PendingIntent contentIntent = PendingIntent.getActivity(this,
+                0, new Intent(this, TeacherActivity.class), 0);
         return new Notification.Builder(this)
                 .setSmallIcon(R.drawable.app_icon)
                 .setContentText(getString(R.string.teacher_mode))
                 .setWhen(System.currentTimeMillis())
                 .setContentTitle(getString(R.string.app_name))
+                .setContentIntent(contentIntent)
                 .build();
     }
 
@@ -313,7 +320,6 @@ public class ServerService extends Service implements Server.OnClientListChanged
         Log.d("TEST", "on destroy");
         mNsdName.stop();
         mNsdRegistration.stop();
-        mIsRunning = false;
         super.onDestroy();
     }
 }

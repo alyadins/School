@@ -57,6 +57,7 @@
         android:orientation="vertical"
         android:gravity="center">
         <ImageButton
+            android:id="@+id/apps"
             android:layout_width="@dimen/block_button_width"
             android:layout_height="@dimen/block_button_height"
             android:scaleType="fitCenter"

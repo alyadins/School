@@ -84,16 +84,17 @@ public class Server implements Connection.OnMessageReceivedListener{
     /*
        Block unblock
     */
-    public void block(List<ParcelableClientInfo> selectedClients){
+    public void block(List<ParcelableClientInfo> selectedClients, List<String> whiteList, List<String> blackList){
         for (ParcelableClientInfo info : selectedClients) {
             ClientConnectionData data = getConnectionDataById(info.clientId);
             ParcelableClientInfo infoForChange = getClientsInfoById(info.clientId);
             try {
-                data.connection.sendMessage(JSONHelper.createConnectionMessage(BLOCK_CODE, "block", mServerId));
+                data.connection.sendMessage(JSONHelper.createBlockJson(mServerId, whiteList, blackList));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
             infoForChange.isBlocked = true;
+            infoForChange.isChosen = true;
         }
         if (mOnClientListChanged != null) {
             mOnClientListChanged.onClientListChanged((mClientsInfo));
@@ -116,6 +117,10 @@ public class Server implements Connection.OnMessageReceivedListener{
         if (mOnClientListChanged != null) {
             mOnClientListChanged.onClientListChanged(mClientsInfo);
         }
+    }
+
+    public void unBlockAll() {
+        unBlock(mClientsInfo);
     }
     public ArrayList<ParcelableClientInfo> getClientsInfo() {
         return mClientsInfo;

@@ -3,6 +3,7 @@ package ru.appkode.school.activity;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,10 +34,21 @@ public class BlockActivity extends Activity {
 
         View v = inflater.inflate(R.layout.block_toast, null);
 
-        Toast toast = new Toast(getApplicationContext());
-        toast.setDuration(Toast.LENGTH_LONG);
-        toast.setGravity(Gravity.CENTER, 0, 0);
+        final Toast toast = new Toast(getApplicationContext());
+        toast.setDuration(Toast.LENGTH_SHORT);
+        toast.setGravity(Gravity.CENTER, 0, 200);
         toast.setView(v);
         toast.show();
+
+
+        //for china tablets =))
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                toast.cancel();
+            }
+        }, 2500);
+
     }
 }

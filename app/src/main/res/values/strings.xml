@@ -39,6 +39,8 @@
     </string-array>
     <string name="favourites">Избранное</string>
     <string name="server_list">Список серверов</string>
+    <string name="error_incorrect_data">Проверьте правильность ввода данных</string>
+    <string name="apps_activity_error">Планшет разблокирован, доступны все приложения</string>
 
     <!-- teacher screen -->
     <string name="to_block">Заблокировать</string>
@@ -69,6 +71,12 @@
         <item>Камера</item>
     </string-array>
 
+    <string-array name="default_black_list">
+        <item>Settings</item>
+    </string-array>
+
     <string name="blocked">Заблокирован</string>
+    <string name="error">Ошибка</string>
+    <string name="clients_connected">Нельзя изменить имя при подключенных клиентах</string>
 
 </resources>
