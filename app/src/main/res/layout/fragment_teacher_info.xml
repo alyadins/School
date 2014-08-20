@@ -10,7 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="10dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:longClickable="false">
         <TextView
             android:id="@+id/name"
             android:layout_width="wrap_content"

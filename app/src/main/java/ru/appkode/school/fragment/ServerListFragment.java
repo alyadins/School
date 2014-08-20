@@ -19,6 +19,9 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     public static final String TAG = "ServerListFragment";
     public static final int CONNECT = 0;
     public static final int DISCONNECT = 1;
+    public static final int FAVOURITE = 2;
+
+    private boolean mIsOnlyFavourite = false;
 
     private List<ParcelableServerInfo> mServerList;
 
@@ -39,9 +42,11 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
         if (serverList != null) {
             if (mAdapter == null) {
                 mAdapter = new ServerListAdapter(getActivity(), R.layout.server_list_item, mServerList);
+                mAdapter.setOnlyFavourite(mIsOnlyFavourite);
                 mAdapter.setOnClientStateChangeListener(this);
                 setListAdapter(mAdapter);
             } else {
+                mAdapter.setOnlyFavourite(mIsOnlyFavourite);
                 mAdapter.setData(serverList);
             }
         }
@@ -58,6 +63,13 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     public void onClientConnect(ParcelableServerInfo info) {
         if (mOnServerAction != null) {
             mOnServerAction.onServerAction(info, CONNECT);
+        }
+    }
+
+    @Override
+    public void onClientFavourite(ParcelableServerInfo info) {
+        if (mOnServerAction != null) {
+            mOnServerAction.onServerAction(info, FAVOURITE);
         }
     }
 
@@ -79,5 +91,9 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
             }
         }
         setServerList(mServerList);
+    }
+
+    public void setOnlyFavourite(boolean isOnlyFavourite) {
+        mIsOnlyFavourite = isOnlyFavourite;
     }
 }

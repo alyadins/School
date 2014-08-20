@@ -56,27 +56,29 @@
 
     <string-array name="default_white_list">
         <item>AZBUKA</item>
-        <item>Classroom Management Teacher</item>
-        <item>Classroom Management Student</item>
-        <item>Active Textbook</item>
-        <item>SPARKvue</item>
+        <item>Classroom management</item>
+        <item>Active Textbook Reader</item>
         <item>ActivEngage 2</item>
-        <item>ЭлЖур Дневник</item>
+        <item>SPARKvue</item>
+        <item>ЭлЖур</item>
         <item>ЕГЭ</item>
-        <item>Nearpod</item>
-        <item>ES проводник</item>
-        <item>Yandex (браузер)</item>
+        <item>Nearprod</item>
+        <item>ES Проводник</item>
+        <item>Yandex</item>
         <item>Яндекс.Store</item>
         <item>Галерея</item>
         <item>Камера</item>
+        <item>Школа</item>
     </string-array>
 
     <string-array name="default_black_list">
-        <item>Settings</item>
+        <item>Настройки</item>
     </string-array>
 
     <string name="blocked">Заблокирован</string>
-    <string name="error">Ошибка</string>
+    <string name="unblocked">Разблокирован</string>
+    <string name="error">Предупреждение</string>
     <string name="clients_connected">Нельзя изменить имя при подключенных клиентах</string>
+    <string name="connected_to_server">Нельзя изменить имя при подключении к серверу</string>
 
 </resources>

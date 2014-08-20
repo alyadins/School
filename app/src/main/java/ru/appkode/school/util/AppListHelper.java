@@ -1,6 +1,8 @@
 package ru.appkode.school.util;
 
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.graphics.drawable.Drawable;
 import android.os.Environment;
 import android.util.Log;
 
@@ -22,39 +24,35 @@ import ru.appkode.school.R;
 /**
  * Created by lexer on 15.08.14.
  */
-public class AppListHelper {
+public class AppListHelper extends FileHelper{
     public static final int BLACK_LIST = 0;
     public static final int WHITE_LIST = 1;
-    private static final String APP_LIST_PATH = "polymedia";
-    private static final String WHITE_LIST_FILE_NAME = "whitelist";
-    private static final String BLACK_LIST_FILE_NAME = "system_blacklist";
 
     private Context mContext;
+
 
     public AppListHelper(Context context) {
         mContext = context;
     }
 
-
     public List<String> getList(int type) {
 
         List<String> list = null;
         if (isExternalStorageAvailable()) {
-            File path = Environment.getExternalStorageDirectory();
-            path = new File(path.getAbsolutePath() + "/" + APP_LIST_PATH);
+            File path = getDirPath();
             File filePath = null;
             switch (type) {
                 case WHITE_LIST:
-                    filePath = new File(path, WHITE_LIST_FILE_NAME);
-                    if (!path.exists()) {
+                    filePath = getFilePath(path, WHITE_LIST_FILE_NAME);
+                    if (!filePath.exists()) {
                         list = readDefaultWhiteList();
                     } else {
                         list = readList(filePath);
                     }
                     break;
                 case BLACK_LIST:
-                    filePath= new File(path, BLACK_LIST_FILE_NAME);
-                    if (!path.exists()) {
+                    filePath = getFilePath(path, BLACK_LIST_FILE_NAME);
+                    if (!filePath.exists()) {
                         list = readDefaultBlackList();
                     } else {
                         list = readList(filePath);
@@ -79,6 +77,7 @@ public class AppListHelper {
 
         return list;
     }
+
 
     private List<String> readDefaultWhiteList() {
         String[] defaultWhite = mContext.getResources().getStringArray(R.array.default_white_list);
@@ -126,13 +125,18 @@ public class AppListHelper {
         }
     }
 
+    static class ApkInfo {
 
-    private boolean isExternalStorageAvailable() {
-        String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state)) {
-            return true;
+        ApkInfo() {
         }
-        return false;
+
+        public String appname;
+        public String pname;
+        public String versionName;
+        public int versionCode;
+        public Drawable icon;
+        public PackageInfo info;
+
     }
 
 }

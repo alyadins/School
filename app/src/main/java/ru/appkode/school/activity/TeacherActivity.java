@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -59,10 +60,6 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_teacher);
 
-        Intent intent = new Intent(TeacherActivity.this, ServerService.class);
-        intent.putExtra(ACTION, STATUS);
-        startService(intent);
-
         mFragmentManager = getFragmentManager();
 
         mTeacherInfoFragment = (TeacherInfoFragment) mFragmentManager.findFragmentByTag(TAG);
@@ -86,8 +83,11 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
 
     @Override
     protected void onResume() {
-        initBroadCastReceiver();
         super.onResume();
+        initBroadCastReceiver();
+        Intent intent = new Intent(TeacherActivity.this, ServerService.class);
+        intent.putExtra(ACTION, STATUS);
+        startService(intent);
     }
 
     @Override
@@ -224,16 +224,16 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
             @Override
             public void onReceive(Context context, Intent intent) {
                 int code = intent.getIntExtra(CODE, 0);
+                Log.d("sharedPreferences", "broadcast recieve = " + code + " context = " + context.getPackageName());
                 switch (code) {
                     case START:
-                        Log.d("TEST", "server started");
+                        sendCommandToService(STATUS, null);
                         break;
                     case IS_NAME_FREE:
                         boolean isFree = intent.getBooleanExtra(MESSAGE, false);
                         if (isFree) {
                             mDialog.dismiss();
                             sendCommandToService(START, mServerInfo);
-                          //  sendCommandToService(STATUS, null);
                         } else {
                             Toast.makeText(TeacherActivity.this, "Занято", Toast.LENGTH_LONG).show();
                         }
@@ -254,8 +254,10 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                         break;
                     case STATUS:
                         boolean isInit = intent.getBooleanExtra(IS_INIT, false);
+                        Log.d("sharedPreferences", "teacher activity status is init = " + isInit);
                         if (isInit) {
                             mServerInfo = intent.getParcelableExtra(NAME);
+                            Log.d("sharedPreferences" , "teacher activity status = " + mServerInfo.name +" " + mServerInfo.lastName);
                             ArrayList<ParcelableClientInfo> i = intent.getParcelableArrayListExtra(NAMES);
                             mClientListFragment.setClients(i);
                             setTeacherInfo();

@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Toast;
 
 import ru.appkode.school.R;
+import ru.appkode.school.util.BlockHelper;
 
 /**
  * Created by lexer on 14.08.14.
@@ -18,6 +20,13 @@ public class BlockActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        boolean isLocked = getIntent().getBooleanExtra(BlockHelper.IS_BLOCKED, false);
+
+        Log.d("TEST", "startBlockActivity is locked = " + isLocked);
+        if (!isLocked) {
+            finish();
+        }
 
         showToast();
 

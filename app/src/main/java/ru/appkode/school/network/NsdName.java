@@ -4,11 +4,8 @@ import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.util.Log;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -17,6 +14,8 @@ import java.util.concurrent.BlockingQueue;
  */
 public class NsdName{
 
+    private static final String SERVER_REGEX = "/^serv[\\w]+/";
+    private static final String CLIENt_REXEX = "/^client[\\w]+/";
     public static final String SERVICE_TYPE = "_http._tcp.";
     public static final int SERVER = 0;
     public static final int CLIENT = 1;
@@ -45,6 +44,8 @@ public class NsdName{
     private OnServerStatusChanged mOnServerStatusChanged;
 
     private int mType;
+
+    private OnDiscoveryStoppedListener mOnDiscoveryStopedListener;
 
     public NsdName(NsdManager mManager, int type) {
         this.mManager = mManager;
@@ -137,31 +138,33 @@ public class NsdName{
         mDiscoveryListener = new NsdManager.DiscoveryListener() {
             @Override
             public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-                Log.d("TEST", "discovery start fail code = " + errorCode);
+                Log.d("NSD", "discovery start fail code = " + errorCode);
                 mIsDiscoveryStarted = false;
             }
 
             @Override
             public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-                Log.d("TEST", "discovery stop fail code = " + errorCode);
+                Log.d("NSD", "discovery stop fail code = " + errorCode);
                 mIsDiscoveryStarted = false;
             }
 
             @Override
             public void onDiscoveryStarted(String serviceType) {
-                Log.d("TEST", "discovery started");
+                Log.d("NSD", "discovery started");
                 mIsDiscoveryStarted = true;
             }
 
             @Override
             public void onDiscoveryStopped(String serviceType) {
-                Log.d("TEST", "discovery stoped");
                 mIsDiscoveryStarted = false;
+                if (mOnDiscoveryStopedListener != null) {
+                    mOnDiscoveryStopedListener.onDiscoveryStoped();
+                }
             }
 
             @Override
             public void onServiceFound(NsdServiceInfo serviceInfo) {
-                Log.d("TEST", "found " + serviceInfo.getServiceName());
+                Log.d("NSD", "found " + serviceInfo.getServiceName());
                 if (!isServiceDiscovered(serviceInfo)) {
                     mDiscoveredServices.add(serviceInfo);
                     if (getTypeOfService(serviceInfo.getServiceName()) == SERVER && mType != SERVER) {
@@ -214,7 +217,7 @@ public class NsdName{
             mIsResolving = true;
         if (!mResolveQueue.isEmpty()) {
             NsdServiceInfo info = mResolveQueue.poll();
-            Log.d("TEST", "try to resolve " + info.getServiceName());
+            Log.d("NSD", "try to resolve " + info.getServiceName());
             mManager.resolveService(info, mResolveListener);
         } else {
             mIsResolving = false;
@@ -224,5 +227,13 @@ public class NsdName{
 
     public void setOnServerStatusChangedListener(OnServerStatusChanged l) {
         mOnServerStatusChanged = l;
+    }
+
+    public void setOnDiscoveryStopedListener(OnDiscoveryStoppedListener l) {
+        mOnDiscoveryStopedListener = l;
+    }
+
+    public interface OnDiscoveryStoppedListener {
+        public void onDiscoveryStoped();
     }
 }

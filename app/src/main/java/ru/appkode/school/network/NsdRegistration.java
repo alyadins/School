@@ -2,6 +2,7 @@ package ru.appkode.school.network;
 
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.util.Log;
 
 /**
  * Created by lexer on 10.08.14.
@@ -73,23 +74,25 @@ public class NsdRegistration implements NsdManager.RegistrationListener {
 
     @Override
     public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        //TODO handle it
+        Log.d("NSD", "registration fail " + serviceInfo.getServiceName());
         mIsRegistered = false;
     }
 
     @Override
     public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        //TODO handle it
+        Log.d("NSD", "unregistration fail " + serviceInfo.getServiceName());
         mIsRegistered = false;
     }
 
     @Override
     public void onServiceRegistered(NsdServiceInfo serviceInfo) {
+        Log.d("NSD", "registered " + serviceInfo.getServiceName());
         mIsRegistered = true;
     }
 
     @Override
     public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
+        Log.d("NSD", "unregistered " + serviceInfo.getServiceName());
         mIsRegistered = false;
         if (mIsNeedNewRegistration) {
             registerService();

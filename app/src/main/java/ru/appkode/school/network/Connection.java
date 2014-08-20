@@ -1,5 +1,7 @@
 package ru.appkode.school.network;
 
+import android.util.Log;
+
 import org.json.JSONException;
 
 import java.io.BufferedReader;
@@ -148,10 +150,12 @@ public class Connection {
     }
 
     public void sendMessage(String message) {
+        Log.d("CONNECTION", "send message" + message);
         mMessageQueue.add(message);
     }
 
     private void processMessage(String message) {
+        Log.d("CONNECTION", "recieve message" + message);
        if (mOnMessageReceivedListener != null) {
            try {
                mOnMessageReceivedListener.onReceiveMessage(this, message);

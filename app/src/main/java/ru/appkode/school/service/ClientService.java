@@ -6,16 +6,21 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
+import ru.appkode.school.Infos;
 import ru.appkode.school.R;
 import ru.appkode.school.activity.StudentActivity;
 import ru.appkode.school.data.ParcelableClientInfo;
@@ -27,6 +32,7 @@ import ru.appkode.school.network.NsdRegistration;
 import ru.appkode.school.network.Server;
 import ru.appkode.school.util.BlockHelper;
 import ru.appkode.school.util.ClientSharedPreferences;
+import ru.appkode.school.util.FavouriteHelper;
 
 /**
  * Created by lexer on 10.08.14.
@@ -36,6 +42,9 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
 
     public static final String ACTION = "action";
     public static final String BROADCAST_ACTION = "ru.appkode.school.clientbroadcast";
+    private static final String BLOCK_TIME = "block_time";
+    private static final String BLOCK_BY_IN_TIME = "block_by_in_time";
+    private static final int MAX_TIME = 40000;
 
     //Actions
     public static final int START = 0;
@@ -44,6 +53,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
     public static final int GET_NAMES = 4;
     public static final int CONNECT = 6;
     public static final int DISCONNECT = 7;
+    public static final int FAVOURITE = 8;
     public static final int BLOCK = 9;
     public static final int UNBLOCK = 10;
     public static final int STATUS = 11;
@@ -56,6 +66,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
     public static final String CODE = "code";
     public static final String MESSAGE = "message";
     public static final String IS_INIT = "is_init";
+    public static final String IS_CONNECTED = "is_connected";
     public static final String WHITE_LIST_PARAM = "white_list";
 
     private NsdManager mManager;
@@ -78,6 +89,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
     private ClientSharedPreferences mClientSharedPreferences;
 
     private BlockHelper mBlockHelper;
+    private FavouriteHelper mFavouriteHelper;
 
     @Override
     public void onCreate() {
@@ -103,6 +115,10 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
 
         mClientSharedPreferences = new ClientSharedPreferences(this);
         mBlockHelper = new BlockHelper(this);
+
+        mFavouriteHelper = new FavouriteHelper();
+
+        startCheckBlockTime();
     }
     private void startForeground() {
         startForeground(NOTIF_ID, getNotification());
@@ -128,7 +144,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
     }
 
     private void runAction(int action, Intent intent) {
-
+        Log.d("TEST", "run action = " + action);
         if (action <= IS_FREE) {
             ParcelableClientInfo clientInfo = intent.getParcelableExtra(NAME);
             switch (action) {
@@ -139,7 +155,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
                     actionIsFree(clientInfo);
                     break;
             }
-        } else if (action >= CONNECT && action <= DISCONNECT) {
+        } else if (action >= CONNECT && action <= FAVOURITE) {
             ParcelableServerInfo serverInfo = intent.getParcelableExtra(NAME);
             switch (action) {
                 case CONNECT:
@@ -148,6 +164,8 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
                 case DISCONNECT:
                     actionDisconnect(serverInfo);
                     break;
+                case FAVOURITE:
+                    actionFavourite(serverInfo);
             }
         } else switch (action) {
             case STATUS:
@@ -192,8 +210,6 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
         mNsdRegistration.setPort(port);
         mNsdRegistration.start();
 
-        mClientConnection.setClientInfo(mClientInfo);
-
         sendSimpleBroadcast(START, "started");
     }
 
@@ -231,11 +247,27 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
     }
 
     private void actionConnect(ParcelableServerInfo serverInfo) {
-        mClientConnection.connect(serverInfo);
+        Log.d("CONNECT", "actionConnect");
+        mClientConnection.connect(serverInfo, mClientInfo);
     }
 
     private void actionDisconnect(ParcelableServerInfo info) {
         mClientConnection.disconnect(info, mClientInfo);
+    }
+
+    private void actionFavourite(ParcelableServerInfo serverInfo) {
+        ParcelableServerInfo info = getServerInfoById(serverInfo.serverId);
+        if (info.isFavourite) {
+            info.isFavourite = false;
+            mFavouriteHelper.remove(serverInfo.serverId);
+            mFavouriteHelper.save();
+        } else {
+            info.isFavourite = true;
+            mFavouriteHelper.add(serverInfo.serverId);
+            mFavouriteHelper.save();
+        }
+
+        actionStatus();
     }
 
     private void actionGetNames() {
@@ -246,6 +278,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
             sendNames(mServersInfo);
         }
 
+        mClientConnection.setSendNames(false);
         mClientConnection.askForServersInfo(mResolvedServers);
 
         if (!mNsdName.isDiscoveryStarted()) {
@@ -259,10 +292,13 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
                 ArrayList<ParcelableServerInfo> infos = mClientConnection.getServersInfo();
                 if (!mIsInfoSend) {
                     sendNames(infos);
+                    mClientConnection.setSendNames(true);
+                    mClientConnection.updateServerList(infos);
                 }
 
             }
         }, 5000);
+
     }
 
     private void actionStatus() {
@@ -286,6 +322,7 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
         if (mClientInfo != null && mClientInfo.isInit()) {
             intent.putExtra(IS_INIT, true);
             intent.putExtra(NAME, mClientInfo);
+            intent.putExtra(IS_CONNECTED, mClientConnection.isConnected());
         } else {
             intent.putExtra(IS_INIT, false);
         }
@@ -299,6 +336,8 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
         if (mWhiteList != null && mWhiteList.size() > 0) {
             intent.putExtra(IS_INIT, mClientInfo.isBlocked);
             intent.putStringArrayListExtra(WHITE_LIST_PARAM, mWhiteList);
+        } else {
+            intent.putExtra(IS_INIT, false);
         }
 
         sendBroadcast(intent);
@@ -314,16 +353,28 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
 
     @Override
     public void OnServerInfoDownload(ParcelableServerInfo info) {
-        mServersInfo.add(info);
+            mServersInfo.add(info);
+        if (mFavouriteHelper.isFavourite(info.serverId)) {
+            info.isFavourite = true;
+        }
 
-        Log.d("TEST", "onServerInfoDownload = " + info.name + " " + info.lastName);
         if (mResolvedServers.size() == mServersInfo.size()) {
             mIsInfoSend = true;
             sendNames(mServersInfo);
+            mClientConnection.setSendNames(true);
+            mClientConnection.updateServerList(mServersInfo);
         }
     }
 
+    private boolean isSeverAlreadyAdded(ParcelableServerInfo info) {
+        for (ParcelableServerInfo i : mServersInfo) {
+            if (i.serverId.equals(info.serverId)) {
+                return true;
+            }
+        }
 
+        return false;
+    }
 
     private void sendNames(ArrayList<ParcelableServerInfo> infos) {
         Intent intent = new Intent(BROADCAST_ACTION);
@@ -343,32 +394,10 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
         ParcelableServerInfo info;
         switch (status) {
             case Server.BLOCK_CODE:
-                mClientInfo.isBlocked = true;
-                mClientInfo.blockedBy = serverId;
-                info = getServerInfoById(serverId);
-                info.isLocked = true;
-                updateNotification();
-                mClientSharedPreferences.writeSharedPreferences(mClientInfo);
-
-                mWhiteList = lists[0];
-                mBlackList =  lists[1];
-                mBlockHelper.setWhiteList(mWhiteList);
-                mBlockHelper.setBlackList(mBlackList);
-                mBlockHelper.block();
-
-                actionStatus();
+                block(serverId, lists);
                 break;
             case Server.UNBLOCK_CODE:
-                mClientInfo.blockedBy = "none";
-                mClientInfo.isBlocked = false;
-
-                unblockAllServers();
-                updateNotification();
-
-                mClientSharedPreferences.writeSharedPreferences(mClientInfo);
-                mBlockHelper.unBlock();
-
-                actionStatus();
+                unblock(serverId);
                 break;
             case Server.CONNECTED:
                 info = getServerInfoById(serverId);
@@ -379,10 +408,49 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
             case Server.DISCONNECTED:
                 info = getServerInfoById(serverId);
                 info.isConnected = false;
+                info.isLocked = false;
                 if (isNeedStatusRefresh)
                     actionStatus();
                 break;
         }
+    }
+
+    private void block(String serverId, ArrayList<String>[] lists) {
+        ParcelableServerInfo info;
+        mClientConnection.checkConnectionsOnBlock(serverId, mClientInfo);
+        mClientInfo.isBlocked = true;
+        mClientInfo.blockedBy = serverId;
+        info = getServerInfoById(serverId);
+        info.isLocked = true;
+        updateNotification();
+        mClientSharedPreferences.writeSharedPreferences(mClientInfo);
+
+        mWhiteList = lists[0];
+        mBlackList =  lists[1];
+        mBlockHelper.setWhiteList(mWhiteList);
+        mBlockHelper.setBlackList(mBlackList);
+        mBlockHelper.block();
+
+        saveBlockTime(serverId);
+
+        actionStatus();
+
+    }
+
+    private void unblock(String serverId) {
+        mClientInfo.blockedBy = "none";
+        mClientInfo.isBlocked = false;
+
+        mClientConnection.checkConnectionForUnblock(serverId, mClientInfo);
+        unblockAllServers();
+        updateNotification();
+        mClientSharedPreferences.writeSharedPreferences(mClientInfo);
+        mBlockHelper.unBlock();
+
+        clearBlockTime();
+
+        actionStatus();
+
     }
 
     private void unblockAllServers() {
@@ -391,7 +459,18 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
         }
     }
 
+    private void saveBlockTime(String serverId) {
+        SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
+        editor.putLong(BLOCK_TIME, System.currentTimeMillis());
+        editor.putString(BLOCK_BY_IN_TIME, serverId);
+        editor.commit();
+    }
 
+    private void clearBlockTime() {
+        SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
+        editor.putLong(BLOCK_TIME, -1);
+        editor.commit();
+    }
 
     private ParcelableServerInfo getServerInfoById(String serverId) {
         for (ParcelableServerInfo info : mServersInfo) {
@@ -401,7 +480,6 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
 
         return null;
     }
-
 
 
     private void updateNotification() {
@@ -441,6 +519,28 @@ public class ClientService extends Service implements ClientConnection.OnStatusC
         WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         WifiManager.WifiLock lock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LockTag");
         lock.acquire();
+    }
+
+    private void startCheckBlockTime() {
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                Log.d("BLOCKTIME", "startCheckBlockTime");
+                SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
+                long blockTime = preferences.getLong(BLOCK_TIME, -1);
+                String blockId = preferences.getString(BLOCK_BY_IN_TIME, "none");
+                Log.d("BLOCKTIME", "blocktime = " + blockTime + " currentTime = " + System.currentTimeMillis());
+                Log.d("BLOCKTIME", "blockid = " + blockId);
+                if (blockTime != -1) {
+                    long currentTime = System.currentTimeMillis();
+                    Log.d("BLOCKTIME", "diff = " + (currentTime - blockTime));
+                    if (currentTime - blockTime > MAX_TIME && !blockId.equals("none")) {
+                        unblock(blockId);
+                    }
+                }
+            }
+        }, 0, ServerService.BLOCK_PERIOD);
     }
 
 

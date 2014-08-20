@@ -1,8 +1,6 @@
 package ru.appkode.school.util;
 
 
-import android.util.Log;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -100,6 +98,11 @@ public class JSONHelper {
         return json.toString();
     }
 
+    public static String createFavouriteJson(List<String> infos) throws JSONException {
+        JSONArray array = new JSONArray(infos);
+        return array.toString();
+    }
+
     /*
         Parsers server
      */
@@ -160,15 +163,15 @@ public class JSONHelper {
     public static ArrayList<String> parseList(String message, String name) throws JSONException {
         JSONObject json = new JSONObject(message);
         JSONArray array = json.getJSONArray(name);
-        return parseAppList(array);
+        return parseStringList(array);
     }
 
     public static ArrayList<String> parseAppList(String result) throws JSONException {
         JSONArray array = new JSONArray(result);
-        return parseAppList(array);
+        return parseStringList(array);
     }
 
-    private static ArrayList<String> parseAppList(JSONArray array) throws JSONException {
+    private static ArrayList<String> parseStringList(JSONArray array) throws JSONException {
         ArrayList<String> list = new ArrayList<String>();
         for (int i = 0; i < array.length(); i++) {
             list.add(array.getString(i));
@@ -176,4 +179,9 @@ public class JSONHelper {
 
         return list;
     }
+
+   public static ArrayList<String> parseFavouriteList(String s) throws JSONException {
+       JSONArray array = new JSONArray(s);
+       return parseStringList(array);
+   }
 }

@@ -3,6 +3,10 @@ package ru.appkode.school.network;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import org.json.JSONException;
 
@@ -26,13 +30,15 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
     private static final String TAG = "ClientConnection";
 
     private ArrayList<ParcelableServerInfo> mServersInfo;
-    private ParcelableClientInfo mClientInfo;
+
     private List<ServerConnectionData> mServers;
 
+    private boolean mIsNamesSend = false;
 
     public interface OnStatusChanged {
         public void OnStatusChanged(int status, String serverId, boolean isNeedStatusRefresh, ArrayList<String>[] lists);
     }
+
 
     public interface OnTeacherListChanged {
         public void onTeacherListChanged(ClientConnection connection, List<ParcelableServerInfo> serversInfo);
@@ -44,29 +50,19 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
     private ServerConnectionData mFirstConnectionData;
     private ServerConnectionData mSecondConnectionData;
-
-
     public ClientConnection() {
         mServersInfo = new ArrayList<ParcelableServerInfo>();
         mServers = new ArrayList<ServerConnectionData>();
     }
 
-    public ClientConnection(ParcelableClientInfo clientInfo) {
-        this();
-        mClientInfo = clientInfo;
-    }
-
-    public void setClientInfo(ParcelableClientInfo clientInfo) {
-        mClientInfo = clientInfo;
-    }
-
-    public void connect(ParcelableServerInfo serverInfo) {
-        if (mClientInfo == null) {
+    public void connect(ParcelableServerInfo serverInfo, ParcelableClientInfo clientInfo) {
+        if (clientInfo == null) {
             throw new IllegalArgumentException("client info is null, init it");
         }
 
-        connectToServer(serverInfo, mClientInfo);
+        connectToServer(serverInfo, clientInfo);
     }
+
 
     public void disconnect(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
         Log.d("TEST", "disconnect from " + info.name + " " + info.lastName);
@@ -74,8 +70,6 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
     }
 
     public void askForServersInfo(List<NsdServiceInfo> infos) {
-        mServers.clear();
-        mServersInfo.clear();
         for (NsdServiceInfo info : infos) {
             askForServerInfo(info);
         }
@@ -87,6 +81,11 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
     public void askForServerInfo(final NsdServiceInfo serviceInfo) {
         try {
+            ParcelableServerInfo serverInfo = getServerInfoById(serviceInfo.getServiceName());
+            if (serverInfo != null && mOnServerInfoDownload != null && !mIsNamesSend) {
+                mOnServerInfoDownload.OnServerInfoDownload(serverInfo);
+                return;
+            }
             Log.d("TEST", "ask info from " + serviceInfo.getHost() + " " + serviceInfo.getPort());
             Connection connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
             connection.setOnMessageReceivedListener(new Connection.OnMessageReceivedListener() {
@@ -97,7 +96,7 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
                             ParcelableServerInfo serverInfo = parseServerInfo(message);
                             mServers.add(new ServerConnectionData(serverInfo.serverId, serviceInfo));
                             mServersInfo.add(serverInfo);
-                            if (mOnServerInfoDownload != null) {
+                            if (mOnServerInfoDownload != null && !mIsNamesSend) {
                                 mOnServerInfoDownload.OnServerInfoDownload(serverInfo);
                             }
                             connection.sendMessage("END");
@@ -118,15 +117,20 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         }
     }
 
-//    public void removeServer(NsdServiceInfo serviceInfo) {
-//        String id = serviceInfo.getServiceName();
-//        mServers.remove(getServerById(id));
-//        mServersInfo.remove(getServerInfoById(id));
-//        if (mOnStatusChanged != null) {
-//            mOnStatusChanged.OnStatusChanged();
-//        }
-//    }
+    public void updateServerList(ArrayList<ParcelableServerInfo> list) {
+        mServersInfo = list;
+    }
 
+    public void setSendNames(boolean isSended) {
+        mIsNamesSend = isSended;
+    }
+
+    public boolean isConnected() {
+        return (mFirstConnectionData != null && mFirstConnectionData.connection != null && mFirstConnectionData.connection.isConnected()) ||
+                (mSecondConnectionData != null && mSecondConnectionData.connection != null && mSecondConnectionData.connection.isConnected());
+    }
+
+//    public void removeServer(NsdServiceInfo serviceInfo) {
 
     public void connectToServer(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
         NsdServiceInfo serviceInfo;
@@ -158,6 +162,29 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
         }
     }
 
+    //        String id = serviceInfo.getServiceName();
+//        mServers.remove(getServerById(id));
+//        mServersInfo.remove(getServerInfoById(id));
+//        if (mOnStatusChanged != null) {
+//            mOnStatusChanged.OnStatusChanged();
+//        }
+    public void checkConnectionsOnBlock(String serverId, ParcelableClientInfo clientInfo) {
+        if (mSecondConnectionData != null && mSecondConnectionData.serverId.equals(serverId)) {
+            sendDisconnect(mFirstConnectionData, clientInfo);
+            mFirstConnectionData = mSecondConnectionData;
+            mSecondConnectionData = null;
+        }
+    }
+
+    public void checkConnectionForUnblock(String serverId, ParcelableClientInfo clientInfo) {
+        if (mSecondConnectionData != null && mSecondConnectionData.serverId.equals(serverId)) {
+            sendDisconnect(mFirstConnectionData, clientInfo);
+            mFirstConnectionData = mSecondConnectionData;
+            mSecondConnectionData = null;
+        }
+    }
+
+
     private ServerConnectionData getServerById(String serverId) {
         for (ServerConnectionData data : mServers) {
             if (data.serverId.equals(serverId)) {
@@ -176,7 +203,6 @@ public class ClientConnection implements Connection.OnMessageReceivedListener {
 
         return null;
     }
-
 
     public void disconnectFromServer(ParcelableClientInfo clientInfo) {
         Log.d("TEST", "mFirstconndata null = " + (mFirstConnectionData == null));

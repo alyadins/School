@@ -1,7 +1,6 @@
 package ru.appkode.school.gui;
 
 import android.content.Context;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,13 +18,13 @@ import ru.appkode.school.data.ParcelableServerInfo;
 /**
  * Created by lexer on 01.08.14.
  */
-public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
-
+public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> implements View.OnClickListener {
 
     private List<ParcelableServerInfo> mServers;
     private int mResId;
-
     private OnClientStateChanged mOnClientStateChanged;
+
+    private boolean mIsOnlyFavourite = false;
 
     public ServerListAdapter(Context context, int resource, List<ParcelableServerInfo> servers) {
         super(context, resource, servers);
@@ -58,6 +57,7 @@ public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
 
         holder.name.setText(fullTeacherName);
         holder.subject.setText(info.subject);
+
         holder.isConnected.setOnCheckedChangeListener(null);
         holder.isConnected.setChecked(info.isConnected);
         holder.isConnected.setEnabled(!info.isLocked);
@@ -79,30 +79,56 @@ public class ServerListAdapter extends ArrayAdapter<ParcelableServerInfo> {
             holder.statusImage.setImageResource(R.drawable.fav);
         }
 
+        holder.statusImage.setTag(position);
+        holder.statusImage.setOnClickListener(this);
         return v;
     }
 
-
     public void setData(List<ParcelableServerInfo> serverList) {
-        mServers.clear();
-        mServers.addAll(serverList);
+        if (!mIsOnlyFavourite) {
+            mServers.clear();
+            mServers.addAll(serverList);
+        } else {
+            mServers.clear();
+            for (ParcelableServerInfo info : serverList) {
+                if (info.isFavourite) {
+                    mServers.add(info);
+                }
+            }
+        }
         notifyDataSetChanged();
     }
 
 
     private class ViewHolder {
+
+
         ImageView statusImage;
         TextView name;
         TextView subject;
         Switch isConnected;
     }
-
     public void setOnClientStateChangeListener(OnClientStateChanged l) {
         mOnClientStateChanged = l;
     }
+
     public interface OnClientStateChanged {
         public void onClientDisconnect(ParcelableServerInfo info);
         public void onClientConnect(ParcelableServerInfo info);
+        public void onClientFavourite(ParcelableServerInfo info);
+    }
+
+    @Override
+    public void onClick(View v) {
+        Integer position = (Integer) v.getTag();
+        ParcelableServerInfo info = mServers.get(position);
+        if (mOnClientStateChanged != null) {
+            mOnClientStateChanged.onClientFavourite(info);
+        }
+    }
+
+    public void setOnlyFavourite(boolean isOnlyFavourite) {
+        this.mIsOnlyFavourite = isOnlyFavourite;
     }
 
 }

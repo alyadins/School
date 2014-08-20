@@ -7,12 +7,11 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
+import android.util.Log;
 
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import ru.appkode.school.activity.BlockActivity;
 
@@ -21,20 +20,20 @@ import ru.appkode.school.activity.BlockActivity;
  */
 public class BlockHelper {
 
-    private static final int CHECK_TIME = 300;
+    private static final long CHECK_TIME = 100;
 
-    private Future<?> mFuture;
-    private ScheduledExecutorService mScheduledExecutorService;
+    public static final String IS_BLOCKED = "is_blocked";
+
     private ActivityManager mActivityManager;
     private Context mContext;
     private List<String> mWhiteList;
     private List<String> mBlackList;
+    private Timer mTimer;
+    private boolean mIsBlock = false;
 
     public BlockHelper(Context context) {
         mContext = context;
         mActivityManager = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
-        mScheduledExecutorService =
-                Executors.newSingleThreadScheduledExecutor();
     }
 
     public BlockHelper(Context context, List<String> whiteList, List<String> blackList) {
@@ -52,31 +51,42 @@ public class BlockHelper {
     }
 
     public void block() {
-        mFuture = mScheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                List<ActivityManager.RunningAppProcessInfo> appProcesses = mActivityManager.getRunningAppProcesses();
-                for (ActivityManager.RunningAppProcessInfo appProcess : appProcesses) {
+        if (!mIsBlock) {
+            mIsBlock = true;
+            mTimer = new Timer();
+            for (String s : mWhiteList) {
+                Log.d("WHITELIST ", s);
+            }
+            mTimer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    List<ActivityManager.RunningAppProcessInfo> appProcesses = mActivityManager.getRunningAppProcesses();
                     ApkInfo apkInfo;
-                    if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                        apkInfo = getInfoFromPackageName(appProcess.pkgList[0], mContext.getApplicationContext());
-                        if (isUserApp(apkInfo.info.applicationInfo)) {
-                            if (mWhiteList != null && !findInList(apkInfo.appname, mWhiteList)) {
-                                sendLockIntent();
-                            }
-                        } else {
-                            if (mBlackList != null && findInList(apkInfo.appname, mBlackList)) {
-                                sendLockIntent();
+                    for (ActivityManager.RunningAppProcessInfo appProcess : appProcesses) {
+                        if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                            apkInfo = getInfoFromPackageName(appProcess.pkgList[0], mContext.getApplicationContext());
+                            if (isUserApp(apkInfo.info.applicationInfo)) {
+                                if (mWhiteList != null && !findInList(apkInfo.appname, mWhiteList)) {
+                                    Log.d("BLOCK", "send lock " + apkInfo.appname);
+                                    sendLockIntent();
+                                }
+                            } else {
+                                if (mBlackList != null && findInList(apkInfo.appname, mBlackList)) {
+                                    sendLockIntent();
+                                }
                             }
                         }
                     }
+                    Log.d("BLOCK", "finished");
                 }
-            }
-        }, 0, CHECK_TIME, TimeUnit.MILLISECONDS);
+            }, 0, CHECK_TIME);
+        }
     }
 
     private void sendLockIntent() {
+        Log.d("TEST", "send lockintent");
         Intent lockIntent = new Intent(mContext, BlockActivity.class);
+        lockIntent.putExtra(IS_BLOCKED, true);
         lockIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         mContext.startActivity(lockIntent);
     }
@@ -94,9 +104,9 @@ public class BlockHelper {
     }
 
     public void unBlock() {
-        if (mFuture != null) {
-            mFuture.cancel(true);
-        }
+        mIsBlock = false;
+        if (mTimer != null)
+            mTimer.cancel();
     }
 
     private boolean isUserApp(ApplicationInfo ai) {

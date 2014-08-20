@@ -10,9 +10,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -23,9 +21,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import java.util.ArrayList;
-import java.util.List;
 
-import ru.appkode.school.Infos;
 import ru.appkode.school.R;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
@@ -33,6 +29,7 @@ import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
 import ru.appkode.school.service.ClientService;
+import ru.appkode.school.util.FavouriteHelper;
 import ru.appkode.school.util.RegExpTestUtil;
 import ru.appkode.school.util.StringUtil;
 
@@ -51,9 +48,9 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
     private StudentInfoFragment mStudentInfoFragment;
     private TabsFragment mTabsFragment;
     private ServerListFragment mServerListFragment;
+    private ServerListFragment mFavouriteListFragment;
 
     //data
-    private List<ParcelableServerInfo> mServersInfo;
     private ParcelableClientInfo mClientInfo;
 
     private AlertDialog mLoginDialog;
@@ -70,11 +67,12 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
 
         if (mStudentInfoFragment == null) {
             mStudentInfoFragment = new StudentInfoFragment();
-            mStudentInfoFragment.setOnShowAppsListener(this);
             FragmentTransaction transaction = mFragmentManager.beginTransaction();
             transaction.add(R.id.user_info, mStudentInfoFragment, StudentInfoFragment.TAG);
             transaction.commit();
         }
+
+        mStudentInfoFragment.setOnShowAppsListener(this);
 
         mTabsFragment = (TabsFragment) mFragmentManager.findFragmentByTag(TabsFragment.TAG);
         if (mTabsFragment == null) {
@@ -92,17 +90,22 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                 mServerListFragment.setOnServerActionListener(this);
                 mTabsFragment.setRightFragment(mServerListFragment, ServerListFragment.TAG + "1");
             }
-            ServerListFragment slf2 = new ServerListFragment();
-            mTabsFragment.setLeftFragment(slf2, ServerListFragment.TAG + "2");
+
+            mFavouriteListFragment = (ServerListFragment) mFragmentManager.findFragmentByTag(ServerListFragment.TAG + "2");
+            if (mFavouriteListFragment == null) {
+                mFavouriteListFragment = new ServerListFragment();
+                mFavouriteListFragment.setOnServerActionListener(this);
+                mFavouriteListFragment.setOnlyFavourite(true);
+                mTabsFragment.setLeftFragment(mFavouriteListFragment, ServerListFragment.TAG + "2");
+            }
         }
-        mServersInfo = new ArrayList<ParcelableServerInfo>();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         initBroadCastReceiver();
-        sendCommandToService(STATUS, null);
+        sendSimpleCommandToService(STATUS);
     }
 
 
@@ -130,15 +133,16 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         int id = item.getItemId();
         switch (id) {
             case R.id.refresh:
-                sendCommandToService(GET_NAMES, null);
+                sendSimpleCommandToService(GET_NAMES);
                 mWaitDialog = new ProgressDialog(this);
                 mWaitDialog.setMessage("Пожалуйста подождите");
+                mWaitDialog.setCancelable(false);
                 mWaitDialog.show();
                 break;
             case R.id.about:
                 break;
             case R.id.change_username:
-                sendCommandToService(CHANGE_NAME, null);
+                sendSimpleCommandToService(CHANGE_NAME);
                 break;
         }
         return super.onOptionsItemSelected(item);
@@ -148,7 +152,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
     public void onServerAction(ParcelableServerInfo info, int action) {
         switch (action) {
             case ServerListFragment.CONNECT:
-                sendConnectCommandToService(CONNECT, info);
+                sendCommandToService(CONNECT, info);
                 break;
             case ServerListFragment.DISCONNECT:
                 if (mClientInfo.isBlocked) {
@@ -156,7 +160,10 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         return;
                     }
                 }
-                sendConnectCommandToService(DISCONNECT, info);
+                sendCommandToService(DISCONNECT, info);
+                break;
+            case ServerListFragment.FAVOURITE:
+                sendCommandToService(FAVOURITE, info);
                 break;
         }
     }
@@ -251,8 +258,8 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         break;
                     case GET_NAMES:
                         ArrayList<ParcelableServerInfo> servers = intent.getParcelableArrayListExtra(NAMES);
-                        mServersInfo = servers;
                         mServerListFragment.setServerList(servers);
+                        mFavouriteListFragment.setServerList(servers);
                         if (mWaitDialog != null)
                             mWaitDialog.dismiss();
                         break;
@@ -265,9 +272,10 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         Log.d("TEST", "is init = " + isInit);
                         if (isInit) {
                             mClientInfo = intent.getParcelableExtra(NAME);
-                            mServersInfo = intent.getParcelableArrayListExtra(NAMES);
+                            ArrayList<ParcelableServerInfo> serverInfos = intent.getParcelableArrayListExtra(NAMES);
                             setUserInfo();
-                            mServerListFragment.setServerList(mServersInfo);
+                            mServerListFragment.setServerList(serverInfos);
+                            mFavouriteListFragment.setServerList(serverInfos);
                             mStudentInfoFragment.setBlock(mClientInfo.isBlocked);
                         } else {
                             showStudentLoginDialog(null);
@@ -276,8 +284,17 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                     case CHANGE_NAME:
                         boolean isNameInit = intent.getBooleanExtra(IS_INIT, false);
                         if (isNameInit) {
-                            ParcelableClientInfo info = intent.getParcelableExtra(NAME);
-                            showStudentLoginDialog(info);
+                            boolean isConnected = intent.getBooleanExtra(IS_CONNECTED, false);
+                            if (!isConnected) {
+                                ParcelableClientInfo info = intent.getParcelableExtra(NAME);
+                                showStudentLoginDialog(info);
+                            } else {
+                                AlertDialog.Builder builder = new AlertDialog.Builder(StudentActivity.this);
+                                builder.setMessage(R.string.connected_to_server)
+                                        .setTitle(R.string.error)
+                                        .setPositiveButton(R.string.ok, null)
+                                        .show();
+                            }
                         } else {
                             showStudentLoginDialog(null);
                         }
@@ -288,10 +305,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                             ArrayList<String> whiteList = intent.getStringArrayListExtra(WHITE_LIST_PARAM);
                             startAppsActivity(whiteList);
                         } else {
-                            AlertDialog.Builder builder = new AlertDialog.Builder(StudentActivity.this);
-                            builder.setMessage(R.string.apps_activity_error);
-                            builder.setPositiveButton(R.string.ok, null);
-                            builder.show();
+                            startAppsActivity(null);
                         }
                 }
             }
@@ -305,8 +319,13 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
     private void sendCommandToService(int action, ParcelableClientInfo info) {
         Intent intent = new Intent(StudentActivity.this, ClientService.class);
         intent.putExtra(ACTION, action);
-        if (info != null)
-            intent.putExtra(NAME, info);
+        intent.putExtra(NAME, info);
+        startService(intent);
+    }
+
+    private void sendSimpleCommandToService(int action) {
+        Intent intent = new Intent(StudentActivity.this, ClientService.class);
+        intent.putExtra(ACTION, action);
         startService(intent);
     }
 
@@ -316,11 +335,10 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         startActivity(appsIntent);
     }
 
-    private void sendConnectCommandToService(int action, ParcelableServerInfo info) {
+    private void sendCommandToService(int action, ParcelableServerInfo info) {
         Intent intent = new Intent(StudentActivity.this, ClientService.class);
         intent.putExtra(ACTION, action);
-        if (info != null)
-            intent.putExtra(NAME, info);
+        intent.putExtra(NAME, info);
         startService(intent);
     }
 
@@ -332,6 +350,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
 
     @Override
     public void onShowApps() {
-        sendCommandToService(WHITE_LIST, null);
+        Log.d("TEST", "send white list command to service");
+        sendSimpleCommandToService(WHITE_LIST);
     }
 }

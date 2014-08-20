@@ -12,8 +12,12 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
+import org.json.JSONException;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import ru.appkode.school.Infos;
 import ru.appkode.school.R;
@@ -21,10 +25,12 @@ import ru.appkode.school.activity.StudentActivity;
 import ru.appkode.school.activity.TeacherActivity;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
+import ru.appkode.school.network.Connection;
 import ru.appkode.school.network.NsdName;
 import ru.appkode.school.network.NsdRegistration;
 import ru.appkode.school.network.Server;
 import ru.appkode.school.util.AppListHelper;
+import ru.appkode.school.util.JSONHelper;
 import ru.appkode.school.util.ServerSharedPreferences;
 
 /**
@@ -32,9 +38,12 @@ import ru.appkode.school.util.ServerSharedPreferences;
  */
 public class ServerService extends Service implements Server.OnClientListChanged {
 
+    private static final String TAG = "ServerService";
+
     public static final int NOTIF_ID = 245;
     public static final String ACTION = "action";
 
+    public static final int BLOCK_PERIOD = 10000;
     //Actions
     public static final int START = 0;
     public static final int IS_NAME_FREE = 1;
@@ -94,6 +103,9 @@ public class ServerService extends Service implements Server.OnClientListChanged
         mAppListHelper = new AppListHelper(this);
         mWhiteList = mAppListHelper.getList(AppListHelper.WHITE_LIST);
         mBlackList = mAppListHelper.getList(AppListHelper.BLACK_LIST);
+
+        startBlockedThread();
+
         this.startForeground();
     }
 
@@ -115,6 +127,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
 
         if (intent != null) {
             int command = intent.getIntExtra(ACTION, -1);
+            Log.d(TAG, "start command = " + command);
             runAction(command, intent);
         }
         return START_STICKY;
@@ -177,13 +190,11 @@ public class ServerService extends Service implements Server.OnClientListChanged
         } else {
             mNsdRegistration.stop();
             while (mNsdRegistration.isRegistered()) {}
-            mServer.disconnectAllClients();
             startService(info);
         }
     }
 
     private void startService(ParcelableServerInfo info) {
-        Log.d("TEST", "start service " + info.name + " " + info.lastName);
         mSharedPreferences.writeSharedPreferences(info);
         mServer.setServerInfo(info);
         while (mServer.getPort() == -1) {}//Wait start server
@@ -192,7 +203,6 @@ public class ServerService extends Service implements Server.OnClientListChanged
         mNsdRegistration.setName(info.serverId);
         mNsdRegistration.setPort(port);
         mNsdRegistration.start();
-
 
         sendSimpleBroadCast(START, "started");
     }
@@ -253,14 +263,16 @@ public class ServerService extends Service implements Server.OnClientListChanged
         Intent intent = new Intent(BROADCAST_ACTION);
         intent.putExtra(CODE, STATUS);
         if (mServerInfo != null && mServerInfo.isInit() && mServer != null) {
+            Log.d(TAG, "status init = " + true);
             intent.putExtra(IS_INIT, true);
             intent.putExtra(NAME, mServerInfo);
             intent.putExtra(NAMES, mServer.getClientsInfo());
         } else {
+            Log.d(TAG, "status init = " + false);
             intent.putExtra(IS_INIT, false);
         }
 
-        sendStickyBroadcast(intent);
+        sendBroadcast(intent);
     }
 
     private void actionClientsConnected() {
@@ -314,6 +326,22 @@ public class ServerService extends Service implements Server.OnClientListChanged
                 .build();
     }
 
+    private void startBlockedThread() {
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                ArrayList<Connection> connections = mServer.getAllBlockedConnections();
+                try {
+                    for (Connection connection : connections) {
+                        connection.sendMessage(JSONHelper.createBlockJson(mServer.getId(), mWhiteList, mBlackList));
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0, BLOCK_PERIOD);
+    }
 
     @Override
     public void onDestroy() {

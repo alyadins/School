@@ -10,6 +10,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import ru.appkode.school.data.ClientConnectionData;
 import ru.appkode.school.data.ParcelableClientInfo;
@@ -20,10 +22,6 @@ import ru.appkode.school.util.JSONHelper;
  * Created by lexer on 01.08.14.
  */
 public class Server implements Connection.OnMessageReceivedListener{
-
-
-    public static final String SERVICE_TYPE = "_http._tcp.";
-
 
     public static final int INFO_CODE = 200;
     public static final int CONNECTED = 201;
@@ -81,6 +79,10 @@ public class Server implements Connection.OnMessageReceivedListener{
         return mPort;
     }
 
+    public String getId() {
+        return mServerId;
+    }
+
     /*
        Block unblock
     */
@@ -95,6 +97,8 @@ public class Server implements Connection.OnMessageReceivedListener{
             }
             infoForChange.isBlocked = true;
             infoForChange.isChosen = true;
+            infoForChange.blockedBy = mServerId;
+            infoForChange.isBlockedByOther = false;
         }
         if (mOnClientListChanged != null) {
             mOnClientListChanged.onClientListChanged((mClientsInfo));
@@ -277,6 +281,18 @@ public class Server implements Connection.OnMessageReceivedListener{
             }
         }
         return false;
+    }
+
+    public ArrayList<Connection> getAllBlockedConnections() {
+        ArrayList<Connection> connections = new ArrayList<Connection>();
+        for (ParcelableClientInfo info : mClientsInfo) {
+            if (info.isBlocked) {
+                Connection connection = getConnectionDataById(info.clientId).connection;
+                connections.add(connection);
+            }
+        }
+
+        return connections;
     }
 
 
