@@ -77,16 +77,30 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
 
     public void connectToServer(String serverId, ParcelableClientInfo info) {
         ConnectionData data = getServerDataById(serverId);
-        if (data != null) {
-            HashMap<String, String> params = getBaseParams(info.id);
-            params.put(NAME, info.name);
-            params.put(LAST_NAME, info.lastName);
-            params.put(GROUP, info.group);
-            params.put(BLOCK_BY, info.blockedBy);
-            try {
-                mSender.sendMessage(createMessage(CONNECT, params), data.address, data.port);
-            } catch (JSONException e) {
-                Log.e(TAG, "error with create json with connect message " + e.getMessage());
+        if (!info.isBlocked) {
+            if (data != null) {
+                Log.d(TAG, "mFirstConnectionData init = " + (mFirstConnectionData != null));
+                if (mFirstConnectionData != null) {
+                    disconnectFromServer(mFirstConnectionData.id, info, mFirstConnectionData.address, mFirstConnectionData.port);
+                }
+                ParcelableServerInfo infoForChange = getServerInfoById(serverId);
+                if (infoForChange != null) {
+                    infoForChange.isLocked = true;
+                    infoForChange.isConnected = true;
+                    if (mOnServerListChange != null)
+                        mOnServerListChange.onServerListChange(mServersInfo);
+                }
+                HashMap<String, String> params = getBaseParams(info.id);
+                params.put(NAME, info.name);
+                params.put(LAST_NAME, info.lastName);
+                params.put(GROUP, info.group);
+                params.put(BLOCK_BY, info.blockedBy);
+                try {
+                    mSender.sendMessage(createMessage(CONNECT, params), data.address, data.port);
+                } catch (JSONException e) {
+                    Log.e(TAG, "error with create json with connect message " + e.getMessage());
+                }
+                mFirstConnectionData = data;
             }
         }
     }
@@ -148,13 +162,13 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
 
     @Override
     public void onMessageReceive(String message, InetAddress address) {
-        Log.d(TAG, "recieve message = " + message + " from " + address.getHostName());
+        Log.d(TAG, "receive message = " + message + " from " + address.getHostName());
         try {
             String method = parseMethod(message);
             if (method.equals(CONNECT_CALLBACK)) {
-
+                methodConnectCallback(message, address);
             } else if (method.equals(DISCONNECT_CALLBACK)) {
-
+                methodDisconnectCallback(message, address);
             } else if (method.equals(INFO_CALLBACK)) {
                 methodInfo(message, address);
             } else if (method.equals(BLOCK)) {
@@ -166,6 +180,48 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
             }
         } catch (JSONException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void methodConnectCallback(String message, InetAddress address) {
+        try {
+            HashMap<String, String> params = parseParams(message);
+            String id = params.get(ID);
+            ParcelableServerInfo infoForChange = getServerInfoById(id);
+            if (infoForChange != null) {
+                infoForChange.isConnected = true;
+                infoForChange.isLocked = false;
+                if (mOnServerListChange != null) {
+                    mOnServerListChange.onServerListChange(mServersInfo);
+                }
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "error parsing params in connect callback " + e.getMessage());
+        }
+    }
+
+    private void methodDisconnectCallback(String message, InetAddress address) {
+        try {
+            HashMap<String, String> params = parseParams(message);
+            String id = params.get(ID);
+            if (mFirstConnectionData != null && mFirstConnectionData.id.equals(id)) {
+                mFirstConnectionData = null;
+            }
+//
+//            if (mSecondConnectionData != null && mSecondConnectionData.id.equals(id)) {
+//                mSecondConnectionData = null;
+//            }
+
+            ParcelableServerInfo infoForChange = getServerInfoById(id);
+            if (infoForChange != null) {
+                infoForChange.isConnected = false;
+           //     infoForChange.isLocked = false;
+                if (mOnServerListChange != null) {
+                    mOnServerListChange.onServerListChange(mServersInfo);
+                }
+            }
+        } catch (JSONException e) {
+            Log.d(TAG, "error with parse params in disconnectCallback " + e.getMessage());
         }
     }
 
@@ -274,6 +330,13 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         HashMap<String, String> params = getBaseParams(info.id);
         try {
             mSender.sendMessage(createMessage(DISCONNECT, params), address, port);
+//            ParcelableServerInfo infoForChange = getServerInfoById(id);
+//            if (infoForChange != null) {
+//                infoForChange.isLocked = true;
+//                if (mOnServerListChange != null) {
+//                    mOnServerListChange.onServerListChange(mServersInfo);
+//                }
+//            }
         } catch (JSONException e) {
             Log.e(TAG, "error with create json with disconnect message" + e.getMessage());
         }
