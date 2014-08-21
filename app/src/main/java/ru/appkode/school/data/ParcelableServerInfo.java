@@ -1,11 +1,7 @@
 package ru.appkode.school.data;
 
-import android.net.nsd.NsdServiceInfo;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.util.Log;
-
-import ru.appkode.school.util.StringUtil;
 
 /**
  * Created by lexer on 01.08.14.
@@ -15,7 +11,7 @@ public class ParcelableServerInfo implements Parcelable {
     public String name;
     public String secondName;
     public String lastName;
-    public String serverId;
+    public String id;
 
     public boolean isFavourite = false;
     public boolean isConnected = false;
@@ -31,7 +27,7 @@ public class ParcelableServerInfo implements Parcelable {
         this.name = strings[1];
         this.secondName = strings[2];
         this.lastName = strings[3];
-        this.serverId = strings[4];
+        this.id = strings[4];
 
         boolean[] booleans = new boolean[3];
         in.readBooleanArray(booleans);
@@ -49,6 +45,11 @@ public class ParcelableServerInfo implements Parcelable {
         this.subject = subject;
     }
 
+    public ParcelableServerInfo(String lastName, String name, String secondName, String subject, String id) {
+        this(lastName, name, secondName, subject);
+        this.id = id;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -60,7 +61,7 @@ public class ParcelableServerInfo implements Parcelable {
                 this.name,
                 this.secondName,
                 this.lastName,
-                this.serverId});
+                this.id});
         dest.writeBooleanArray(new boolean[] {
                 this.isFavourite,
                 this.isConnected,
@@ -78,10 +79,15 @@ public class ParcelableServerInfo implements Parcelable {
     };
 
     public boolean isInit() {
-        if (name != null && secondName != null && lastName != null && subject != null && serverId != null) {
+        if (name != null && secondName != null && lastName != null && subject != null && id != null) {
             return true;
         } else {
             return false;
         }
+    }
+
+    @Override
+    public String toString() {
+        return name + " " + secondName + " " + lastName + " " + subject;
     }
 }

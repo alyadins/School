@@ -85,7 +85,7 @@ public class ServerListFragment extends ListFragment implements  ServerListAdapt
     public void setLocked(String serverId, boolean locked) {
         Log.d("TEST", "lock id = " + serverId + " locked = " + locked);
         for (ParcelableServerInfo info : mServerList) {
-            if (info.serverId.equals(serverId)) {
+            if (info.id.equals(serverId)) {
                 info.isLocked = locked;
                 break;
             }

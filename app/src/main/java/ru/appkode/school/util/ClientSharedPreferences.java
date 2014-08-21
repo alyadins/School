@@ -2,7 +2,6 @@ package ru.appkode.school.util;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 import ru.appkode.school.Infos;
 import ru.appkode.school.data.ParcelableClientInfo;
@@ -33,7 +32,7 @@ public class ClientSharedPreferences {
                 clientInfo.name = name;
                 clientInfo.lastName = lastName;
                 clientInfo.group = group;
-                clientInfo.clientId = id;
+                clientInfo.id = id;
                 if (!blockBy.equals("none")) {
                     clientInfo.isBlocked = true;
                     clientInfo.blockedBy = blockBy;
@@ -52,7 +51,7 @@ public class ClientSharedPreferences {
         SharedPreferences preferences = mContext.getApplicationContext().getSharedPreferences(Infos.PREFERENCES, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
 
-        editor.putString(Infos.ID, info.clientId);
+        editor.putString(Infos.ID, info.id);
         editor.putString(Infos.CLIENT_NAME, info.name);
         editor.putString(Infos.CLIENT_LASTNAME, info.lastName);
         editor.putString(Infos.CLIENT_GROUP, info.group);

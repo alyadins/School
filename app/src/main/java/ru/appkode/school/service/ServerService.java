@@ -5,38 +5,28 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.net.wifi.WifiManager;
-import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
-import org.json.JSONException;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 
-import ru.appkode.school.Infos;
 import ru.appkode.school.R;
-import ru.appkode.school.activity.StudentActivity;
 import ru.appkode.school.activity.TeacherActivity;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
-import ru.appkode.school.network.Connection;
 import ru.appkode.school.network.NsdName;
 import ru.appkode.school.network.NsdRegistration;
-import ru.appkode.school.network.Server;
+import ru.appkode.school.network.ServerConnection;
 import ru.appkode.school.util.AppListHelper;
-import ru.appkode.school.util.JSONHelper;
 import ru.appkode.school.util.ServerSharedPreferences;
 
 /**
  * Created by lexer on 10.08.14.
  */
-public class ServerService extends Service implements Server.OnClientListChanged {
+public class ServerService extends Service implements ServerConnection.OnClientListChanged {
 
     private static final String TAG = "ServerService";
 
@@ -72,31 +62,31 @@ public class ServerService extends Service implements Server.OnClientListChanged
     private NsdManager mManager;
     private NsdRegistration mNsdRegistration;
     private NsdName mNsdName;
-    private ServerSharedPreferences mSharedPreferences;
 
-    private Server mServer;
+    private ServerConnection mServerConnection;
     private ParcelableServerInfo mServerInfo;
 
     private AppListHelper mAppListHelper;
-    private List<String> mWhiteList;
-    private List<String> mBlackList;
+    private ArrayList<String> mWhiteList;
+    private ArrayList<String> mBlackList;
+    private ServerSharedPreferences mSharedPreferences;
 
     private boolean mIsFirstLaunch = true;
 
     @Override
     public void onCreate() {
         super.onCreate();
+
         mManager = (NsdManager) getSystemService(NSD_SERVICE);
+
         mNsdRegistration = new NsdRegistration(mManager);
         mNsdName = new NsdName(mManager, NsdName.SERVER);
         mNsdName.start();
-        mSharedPreferences = new ServerSharedPreferences(this);
-        mServer = new Server();
-        mServer.start();
-        mServer.setOnClientListChangedListener(this);
-        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        WifiManager.WifiLock lock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LockTag");
-        lock.acquire();
+
+        mServerConnection = new ServerConnection();
+        mServerConnection.setOnClientListChangedListener(this);
+
+        lockWifi();
 
         mServerInfo = new ParcelableServerInfo();
 
@@ -104,7 +94,12 @@ public class ServerService extends Service implements Server.OnClientListChanged
         mWhiteList = mAppListHelper.getList(AppListHelper.WHITE_LIST);
         mBlackList = mAppListHelper.getList(AppListHelper.BLACK_LIST);
 
-        startBlockedThread();
+        mServerConnection.setWhiteList(mWhiteList);
+        mServerConnection.setBlackList(mBlackList);
+
+        mSharedPreferences = new ServerSharedPreferences(this);
+
+     //   startBlockedThread();
 
         this.startForeground();
     }
@@ -117,9 +112,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (mIsFirstLaunch) {
-            Log.d("sharedPreferences", "check SP on start");
             if (mSharedPreferences.checkSharedPreferences(mServerInfo)) {
-                Log.d("sharedPreferences", "onStart  id = " + mServerInfo.serverId + " name = " + mServerInfo.name);
                 actionStart(mServerInfo);
             }
             mIsFirstLaunch = false;
@@ -127,7 +120,6 @@ public class ServerService extends Service implements Server.OnClientListChanged
 
         if (intent != null) {
             int command = intent.getIntExtra(ACTION, -1);
-            Log.d(TAG, "start command = " + command);
             runAction(command, intent);
         }
         return START_STICKY;
@@ -196,43 +188,22 @@ public class ServerService extends Service implements Server.OnClientListChanged
 
     private void startService(ParcelableServerInfo info) {
         mSharedPreferences.writeSharedPreferences(info);
-        mServer.setServerInfo(info);
-        while (mServer.getPort() == -1) {}//Wait start server
-        int port = mServer.getPort();
 
-        mNsdRegistration.setName(info.serverId);
-        mNsdRegistration.setPort(port);
+        mNsdRegistration.setName(info.id);
+        mNsdRegistration.setPort(Integer.parseInt(mServerConnection.getPort()));
         mNsdRegistration.start();
+
+        mServerConnection.setServerInfo(info);
 
         sendSimpleBroadCast(START, "started");
     }
 
     private void actionIsNameFree(final ParcelableServerInfo info) {
-        for (int i = 0; i < 10; i++) {
-            if (!mNsdName.isDiscoveryStarted()) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            } else if (i == 10) {
-                throw new InternalError("discovery isn't started");
-            } else {
-                break;
-            }
-        }
-        //wait 0.5 seconds for discover
-        Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                boolean isNameFree = mNsdName.isNameFree(info.serverId, mServerInfo.serverId);
-                Intent intent = new Intent(BROADCAST_ACTION);
-                intent.putExtra(CODE, IS_NAME_FREE);
-                intent.putExtra(MESSAGE, isNameFree);
-                sendBroadcast(intent);
-            }
-        }, 500);
+        boolean isNameFree = mNsdName.isNameFree(info.id, mServerInfo.id);
+        Intent intent = new Intent(BROADCAST_ACTION);
+        intent.putExtra(CODE, IS_NAME_FREE);
+        intent.putExtra(MESSAGE, isNameFree);
+        sendBroadcast(intent);
     }
 
     private void actionStop() {
@@ -241,34 +212,29 @@ public class ServerService extends Service implements Server.OnClientListChanged
     }
 
     private void actionBlock(List<ParcelableClientInfo> names) {
-        mServer.block(names, mWhiteList, mBlackList);
-        sendSimpleBroadCast(BLOCK, "blocked");
+        mServerConnection.blockClients(names);
     }
 
     private void actionUnblock(List<ParcelableClientInfo> names) {
-        mServer.unBlock(names);
-        sendSimpleBroadCast(UNBLOCK, "unblocked");
+        mServerConnection.unblockClients(names);
     }
 
     private void actionDelete(List<ParcelableClientInfo> names) {
-        mServer.disconnect(names);
-        sendSimpleBroadCast(DELETE, "deleted");
+        mServerConnection.disconnectClients(names);
     }
 
     private void actionGetClients() {
-        sendBroadCastClientsList(mServer.getClientsInfo());
+ //       sendBroadCastClientsList(mServerConnection.getClientsInfo());
     }
 
     private void actionStatus() {
         Intent intent = new Intent(BROADCAST_ACTION);
         intent.putExtra(CODE, STATUS);
-        if (mServerInfo != null && mServerInfo.isInit() && mServer != null) {
-            Log.d(TAG, "status init = " + true);
+        if (mServerInfo != null && mServerInfo.isInit() && mServerConnection != null) {
             intent.putExtra(IS_INIT, true);
             intent.putExtra(NAME, mServerInfo);
-            intent.putExtra(NAMES, mServer.getClientsInfo());
+            intent.putExtra(NAMES, mServerConnection.getClientsInfo());
         } else {
-            Log.d(TAG, "status init = " + false);
             intent.putExtra(IS_INIT, false);
         }
 
@@ -278,7 +244,7 @@ public class ServerService extends Service implements Server.OnClientListChanged
     private void actionClientsConnected() {
         Intent intent = new Intent(BROADCAST_ACTION);
         intent.putExtra(CODE, CLIENTS_CONNECTED);
-        intent.putExtra(IS_CLIENTS_CONNECTED, mServer.getClientsInfo().size() > 0);
+        intent.putExtra(IS_CLIENTS_CONNECTED, mServerConnection.getClientsInfo().size() > 0);
         sendBroadcast(intent);
     }
 
@@ -296,16 +262,15 @@ public class ServerService extends Service implements Server.OnClientListChanged
     }
 
     @Override
-    public void onClientListChanged(ArrayList<ParcelableClientInfo> clientsInfo) {
+    public void onClientsListChanged(ArrayList<ParcelableClientInfo> clientsInfo) {
+        for (ParcelableClientInfo info : clientsInfo) {
+            Log.d(TAG, info.toString());
+        }
+
         actionStatus();
     }
 
-    private void sendBroadCastClientsList(ArrayList<ParcelableClientInfo> clientsInfo) {
-        Intent intent = new Intent(BROADCAST_ACTION);
-        intent.putParcelableArrayListExtra(NAMES, clientsInfo);
-        intent.putExtra(CODE, GET_CLIENTS);
-        sendBroadcast(intent);
-    }
+
     private void sendSimpleBroadCast(int code, String message) {
         Intent intent = new Intent(BROADCAST_ACTION);
         intent.putExtra(CODE, code);
@@ -326,21 +291,27 @@ public class ServerService extends Service implements Server.OnClientListChanged
                 .build();
     }
 
-    private void startBlockedThread() {
-        Timer timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                ArrayList<Connection> connections = mServer.getAllBlockedConnections();
-                try {
-                    for (Connection connection : connections) {
-                        connection.sendMessage(JSONHelper.createBlockJson(mServer.getId(), mWhiteList, mBlackList));
-                    }
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-        }, 0, BLOCK_PERIOD);
+//    private void startBlockedThread() {
+//        Timer timer = new Timer();
+//        timer.schedule(new TimerTask() {
+//            @Override
+//            public void run() {
+//                ArrayList<Connection> connections = mServerConnection.getAllBlockedConnections();
+//                try {
+//                    for (Connection connection : connections) {
+//                        connection.sendMessage(JSONHelper.createBlockJson(mServerConnection.getId(), mWhiteList, mBlackList));
+//                    }
+//                } catch (JSONException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        }, 0, BLOCK_PERIOD);
+//    }
+
+    private void lockWifi() {
+        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        WifiManager.WifiLock lock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LockTag");
+        lock.acquire();
     }
 
     @Override

@@ -17,19 +17,24 @@ public class MessageSender {
 
     private static final String TAG = "MessageSender";
 
-    public void sendMessage(String message, String ip, int port) {
-        Thread thread = new Thread(new SendingThread(message, ip, port));
-        thread.run();
+    public void sendMessage(String message, InetAddress address, String port) {
+        Thread thread = new Thread(new SendingThread(message, address, Integer.parseInt(port)));
+        thread.start();
+    }
+
+    public void sendMessage(String message, InetAddress address, int port) {
+        Thread thread = new Thread(new SendingThread(message, address, port));
+        thread.start();
     }
 
     class SendingThread implements Runnable {
         String message;
-        String ip;
+        InetAddress address;
         int port;
 
-        SendingThread(String message, String ip, int port) {
+        SendingThread(String message, InetAddress address, int port) {
             this.message = message;
-            this.ip = ip;
+            this.address = address;
             this.port = port;
         }
 
@@ -37,11 +42,13 @@ public class MessageSender {
         public void run() {
             Socket socket = null;
             try {
-                InetAddress address = InetAddress.getByName(ip);
                 socket = new Socket(address, port);
+
+                Log.d(TAG, "send message to " + address + " " + port);
 
                 PrintWriter writer = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
                 writer.println(message);
+                writer.println(ConnectionParams.END);
                 writer.flush();
             } catch (UnknownHostException e) {
                 Log.e(TAG, "unknown host exception " + e.getMessage());

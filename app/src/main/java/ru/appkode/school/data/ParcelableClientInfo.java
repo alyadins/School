@@ -8,7 +8,7 @@ import android.os.Parcelable;
  */
 public class ParcelableClientInfo implements Parcelable {
 
-    public String clientId;
+    public String id;
     public String name;
     public String lastName;
     public String group;
@@ -27,10 +27,15 @@ public class ParcelableClientInfo implements Parcelable {
         this.group = group;
     }
 
+    public ParcelableClientInfo(String name, String lastName, String group, String id) {
+        this(name, lastName, group);
+        this.id = id;
+    }
+
     public ParcelableClientInfo(Parcel in) {
         String[] strings = new String[5];
         in.readStringArray(strings);
-        this.clientId = strings[0];
+        this.id = strings[0];
         this.name = strings[1];
         this.lastName = strings[2];
         this.group = strings[3];
@@ -50,7 +55,7 @@ public class ParcelableClientInfo implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeStringArray(new String[] {this.clientId,
+        dest.writeStringArray(new String[] {this.id,
                 this.name,
                 this.lastName,
                 this.group,
@@ -72,10 +77,15 @@ public class ParcelableClientInfo implements Parcelable {
     };
 
     public boolean isInit() {
-        if (name != null && lastName != null && group != null && blockedBy != null && clientId != null) {
+        if (name != null && lastName != null && group != null && blockedBy != null && id != null) {
             return true;
         } else {
             return false;
         }
+    }
+
+    @Override
+    public String toString() {
+        return name + " " + lastName + " " + group;
     }
 }

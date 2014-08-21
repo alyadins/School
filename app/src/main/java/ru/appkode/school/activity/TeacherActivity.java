@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -182,7 +181,7 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 .append(mServerInfo.lastName)
                 .append(mServerInfo.subject);
 
-        mServerInfo.serverId = "serv" + StringUtil.md5(buffer.toString().toLowerCase());
+        mServerInfo.id = "serv" + StringUtil.md5(buffer.toString().toLowerCase());
 
         Intent nameIntent = new Intent(TeacherActivity.this, ServerService.class);
         nameIntent.putExtra(ACTION, IS_NAME_FREE);

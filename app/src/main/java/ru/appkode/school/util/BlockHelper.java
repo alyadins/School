@@ -67,7 +67,7 @@ public class BlockHelper {
                             apkInfo = getInfoFromPackageName(appProcess.pkgList[0], mContext.getApplicationContext());
                             if (isUserApp(apkInfo.info.applicationInfo)) {
                                 if (mWhiteList != null && !findInList(apkInfo.appname, mWhiteList)) {
-                                    Log.d("BLOCK", "send lock " + apkInfo.appname);
+                                    Log.d("SERVER_BLOCK", "send lock " + apkInfo.appname);
                                     sendLockIntent();
                                 }
                             } else {
@@ -77,7 +77,7 @@ public class BlockHelper {
                             }
                         }
                     }
-                    Log.d("BLOCK", "finished");
+                    Log.d("SERVER_BLOCK", "finished");
                 }
             }, 0, CHECK_TIME);
         }

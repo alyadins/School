@@ -39,7 +39,7 @@ public class ServerSharedPreferences {
                 serverInfo.secondName = secondName;
                 serverInfo.lastName = lastName;
                 serverInfo.subject = subject;
-                serverInfo.serverId = id;
+                serverInfo.id = id;
                 Log.d(TAG, "return true");
                 return true;
             }
@@ -54,7 +54,7 @@ public class ServerSharedPreferences {
         SharedPreferences preferences = mContext.getSharedPreferences(Infos.PREFERENCES, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
 
-        editor.putString(Infos.ID, info.serverId);
+        editor.putString(Infos.ID, info.id);
         editor.putString(Infos.SERVER_NAME, info.name);
         editor.putString(Infos.SERVER_SECONDNAME, info.secondName);
         editor.putString(Infos.SERVER_LASTNAME, info.lastName);

@@ -1,15 +1,18 @@
 package ru.appkode.school.network;
 
+import android.content.Context;
+import android.net.wifi.WifiManager;
+import android.text.format.Formatter;
 import android.util.Log;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
+import java.math.BigInteger;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 
 /**
  * Created by lexer on 20.08.14.
@@ -18,11 +21,10 @@ public class MessageReceiver {
 
     private static final String TAG = "MessageReceiver";
 
-    private String mIp;
-    private int mPort;
+    private int mPort = -1;
 
     public interface OnMessageReceive {
-        public void onMessageRecieve(String message);
+        public void onMessageReceive(String message, InetAddress address);
     }
 
     private OnMessageReceive mOnMessageReceiveListener;
@@ -32,12 +34,15 @@ public class MessageReceiver {
         thread.start();
     }
 
-    public String getIp() {
-        return mIp;
-    }
-
     public int getPort() {
         return mPort;
+    }
+
+    public boolean isInit() {
+        if (mPort != -1)
+            return true;
+        else
+            return false;
     }
 
     public void setOnMessageReceiveListener(OnMessageReceive l) {
@@ -45,7 +50,8 @@ public class MessageReceiver {
     }
 
     private void startConnection(Socket socket) {
-
+        Thread thread = new Thread(new ReceivingThread(socket));
+        thread.start();
     }
 
     class ServerThread implements Runnable {
@@ -55,7 +61,9 @@ public class MessageReceiver {
             try {
                 serverSocket = new ServerSocket(0);
                 mPort = serverSocket.getLocalPort();
-                mIp = serverSocket.getInetAddress().getHostAddress();
+
+                Log.d(TAG, "start service on port " + mPort);
+
                 while (!Thread.currentThread().isInterrupted()) {
                     Socket socket = serverSocket.accept();
                     startConnection(socket);
@@ -88,10 +96,10 @@ public class MessageReceiver {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     while (!Thread.currentThread().isInterrupted()) {
                         String message = reader.readLine();
-                        if (message == null || message.equals("END"))
+                        if (message == null || message.equals(ConnectionParams.END))
                             break;
                         else if (mOnMessageReceiveListener != null) {
-                            mOnMessageReceiveListener.onMessageRecieve(message);
+                            mOnMessageReceiveListener.onMessageReceive(message, socket.getInetAddress());
                         }
                     }
                 }

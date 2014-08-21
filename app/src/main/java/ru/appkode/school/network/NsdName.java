@@ -158,7 +158,7 @@ public class NsdName{
             public void onDiscoveryStopped(String serviceType) {
                 mIsDiscoveryStarted = false;
                 if (mOnDiscoveryStopedListener != null) {
-                    mOnDiscoveryStopedListener.onDiscoveryStoped();
+                    mOnDiscoveryStopedListener.onDiscoveryStopped();
                 }
             }
 
@@ -234,6 +234,6 @@ public class NsdName{
     }
 
     public interface OnDiscoveryStoppedListener {
-        public void onDiscoveryStoped();
+        public void onDiscoveryStopped();
     }
 }

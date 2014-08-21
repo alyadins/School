@@ -35,9 +35,9 @@ public class AppListHelper extends FileHelper{
         mContext = context;
     }
 
-    public List<String> getList(int type) {
+    public ArrayList<String> getList(int type) {
 
-        List<String> list = null;
+        ArrayList<String> list = null;
         if (isExternalStorageAvailable()) {
             File path = getDirPath();
             File filePath = null;
@@ -71,26 +71,22 @@ public class AppListHelper extends FileHelper{
                     list = readDefaultBlackList();
             }
         }
-        if (type == WHITE_LIST) {
-            list.add(mContext.getString(R.string.app_name));
-        }
-
         return list;
     }
 
 
-    private List<String> readDefaultWhiteList() {
+    private ArrayList<String> readDefaultWhiteList() {
         String[] defaultWhite = mContext.getResources().getStringArray(R.array.default_white_list);
         return new ArrayList<String>(Arrays.asList(defaultWhite));
     }
 
-    private List<String> readDefaultBlackList() {
+    private ArrayList<String> readDefaultBlackList() {
         String[] defaultBlack = mContext.getResources().getStringArray(R.array.default_black_list);
         return new ArrayList<String>(Arrays.asList(defaultBlack));
     }
 
-    private List<String> readList(File file) {
-        List<String> list = new ArrayList<String>();
+    private ArrayList<String> readList(File file) {
+        ArrayList<String> list = new ArrayList<String>();
         String result = "";
         try {
             BufferedReader br = new BufferedReader(new FileReader(file));

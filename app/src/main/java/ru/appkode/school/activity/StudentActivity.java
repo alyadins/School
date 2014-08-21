@@ -29,11 +29,11 @@ import ru.appkode.school.fragment.ServerListFragment;
 import ru.appkode.school.fragment.StudentInfoFragment;
 import ru.appkode.school.fragment.TabsFragment;
 import ru.appkode.school.service.ClientService;
-import ru.appkode.school.util.FavouriteHelper;
 import ru.appkode.school.util.RegExpTestUtil;
 import ru.appkode.school.util.StringUtil;
 
 import static ru.appkode.school.service.ClientService.*;
+import static ru.appkode.school.service.ClientService.TAG;
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 
@@ -42,6 +42,8 @@ import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
  */
 public class StudentActivity extends Activity implements ServerListFragment.OnServerAction, StudentInfoFragment.OnShowApps {
 
+
+    private static final String TAG = "StudentActivity";
 
     //fragments
     private FragmentManager mFragmentManager;
@@ -134,10 +136,6 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         switch (id) {
             case R.id.refresh:
                 sendSimpleCommandToService(GET_NAMES);
-                mWaitDialog = new ProgressDialog(this);
-                mWaitDialog.setMessage("Пожалуйста подождите");
-                mWaitDialog.setCancelable(false);
-                mWaitDialog.show();
                 break;
             case R.id.about:
                 break;
@@ -156,7 +154,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                 break;
             case ServerListFragment.DISCONNECT:
                 if (mClientInfo.isBlocked) {
-                    if (mClientInfo.blockedBy.equals(info.serverId)) {
+                    if (mClientInfo.blockedBy.equals(info.id)) {
                         return;
                     }
                 }
@@ -222,7 +220,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
             blockBy = mClientInfo.blockedBy;
         }
         mClientInfo = new ParcelableClientInfo(name, lastName, group);
-        mClientInfo.clientId = clientId;
+        mClientInfo.id = clientId;
         mClientInfo.isBlocked = block;
         mClientInfo.blockedBy = blockBy;
 
@@ -257,11 +255,6 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                     case DISCONNECT:
                         break;
                     case GET_NAMES:
-                        ArrayList<ParcelableServerInfo> servers = intent.getParcelableArrayListExtra(NAMES);
-                        mServerListFragment.setServerList(servers);
-                        mFavouriteListFragment.setServerList(servers);
-                        if (mWaitDialog != null)
-                            mWaitDialog.dismiss();
                         break;
                     case BLOCK:
                         break;
@@ -269,11 +262,15 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         break;
                     case STATUS:
                         boolean isInit = intent.getBooleanExtra(IS_INIT, false);
-                        Log.d("TEST", "is init = " + isInit);
+                        Log.d(TAG, "is init = " + isInit);
                         if (isInit) {
                             mClientInfo = intent.getParcelableExtra(NAME);
                             ArrayList<ParcelableServerInfo> serverInfos = intent.getParcelableArrayListExtra(NAMES);
+                            for (ParcelableServerInfo i : serverInfos) {
+                                Log.d(TAG, i.toString());
+                            }
                             setUserInfo();
+                            Log.d(TAG, "status set");
                             mServerListFragment.setServerList(serverInfos);
                             mFavouriteListFragment.setServerList(serverInfos);
                             mStudentInfoFragment.setBlock(mClientInfo.isBlocked);
