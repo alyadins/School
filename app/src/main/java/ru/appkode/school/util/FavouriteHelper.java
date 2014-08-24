@@ -53,7 +53,7 @@ public class FavouriteHelper extends FileHelper{
     }
 
     private void init() {
-        mFavouriteList = readFavouriteList();
+     //   mFavouriteList = readFavouriteList();
         if (mFavouriteList == null) {
             mFavouriteList = new ArrayList<String>();
         }

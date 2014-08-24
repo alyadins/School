@@ -32,6 +32,7 @@ public interface ConnectionParams {
     public static final String PORT = "port";
     public static final String WHITE_LIST = "white_list";
     public static final String BLACK_LIST = "black_list";
+    public static final String FROM = "from";
 
 
     //End of connection

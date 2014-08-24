@@ -81,8 +81,9 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
 
     public void disconnectClients(List<ParcelableClientInfo> clientsInfo) {
         for (ParcelableClientInfo info : clientsInfo) {
-            unblock(info);
-            disconnect(info);
+            if (!info.isBlockedByOther)
+                unblock(info);
+            disconnect(mServerInfo.id, info);
         }
     }
 
@@ -145,9 +146,12 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
             if (blockBy.equals("none")) {
                 info.isBlocked = false;
                 info.blockedBy = "none";
+            } else if (blockBy.equals(mServerInfo.id)) {
+                info.isBlocked = true;
             } else {
                 info.isBlocked = true;
                 info.blockedBy = blockBy;
+                info.isBlockedByOther = true;
             }
 
             mClientsInfo.add(info);
@@ -198,6 +202,12 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
         if (mWhiteList == null || mBlackList == null) {
             throw new NullPointerException("init white list and black list");
         }
+        if (info.isBlockedByOther) {
+            ConnectionData dataForDisconnect = getClientConnectionDataById(info.id);
+            if (dataForDisconnect != null) {
+                disconnect(info.blockedBy, info);
+            }
+        }
         try {
             ConnectionData data = getClientConnectionDataById(info.id);
             if (data != null) {
@@ -208,6 +218,7 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
                 if (infoForChange != null) {
                     infoForChange.isBlocked = true;
                     infoForChange.blockedBy = mServerInfo.id;
+                    infoForChange.isBlockedByOther = false;
                     infoForChange.isChosen = true;
                     if (mOnClientListChanged != null) {
                         mOnClientListChanged.onClientsListChanged(mClientsInfo);
@@ -220,6 +231,12 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
     }
 
     private void unblock(ParcelableClientInfo info) {
+        if (info.isBlockedByOther) {
+            ConnectionData dataForDisconnect = getClientConnectionDataById(info.id);
+            if (dataForDisconnect != null) {
+                disconnect(info.blockedBy, info);
+            }
+        }
         ConnectionData data = getClientConnectionDataById(info.id);
         try {
             HashMap<String, String> params = getBaseParams();
@@ -231,6 +248,7 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
                 if (infoForChange != null) {
                     infoForChange.isBlocked = false;
                     infoForChange.blockedBy = "none";
+                    infoForChange.isBlockedByOther = false;
                     infoForChange.isChosen = true;
                     if (mOnClientListChanged != null) {
                         mOnClientListChanged.onClientsListChanged(mClientsInfo);
@@ -243,10 +261,11 @@ public class ServerConnection implements MessageReceiver.OnMessageReceive {
     }
 
 
-    private void disconnect(ParcelableClientInfo info) {
+    private void disconnect(String id, ParcelableClientInfo info) {
         ConnectionData data = getClientConnectionDataById(info.id);
         try {
             HashMap<String, String> params = getBaseParams();
+            params.put(FROM, id);
             if (data != null) {
                 String message = createMessage(DISCONNECT_FROM, params);
                 mSender.sendMessage(message, data.address, data.port);

@@ -83,25 +83,37 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
                 if (mFirstConnectionData != null) {
                     disconnectFromServer(mFirstConnectionData.id, info, mFirstConnectionData.address, mFirstConnectionData.port);
                 }
-                ParcelableServerInfo infoForChange = getServerInfoById(serverId);
-                if (infoForChange != null) {
-                    infoForChange.isLocked = true;
-                    infoForChange.isConnected = true;
-                    if (mOnServerListChange != null)
-                        mOnServerListChange.onServerListChange(mServersInfo);
-                }
-                HashMap<String, String> params = getBaseParams(info.id);
-                params.put(NAME, info.name);
-                params.put(LAST_NAME, info.lastName);
-                params.put(GROUP, info.group);
-                params.put(BLOCK_BY, info.blockedBy);
-                try {
-                    mSender.sendMessage(createMessage(CONNECT, params), data.address, data.port);
-                } catch (JSONException e) {
-                    Log.e(TAG, "error with create json with connect message " + e.getMessage());
-                }
+                connectToServer(serverId, info, data);
                 mFirstConnectionData = data;
             }
+        } else {
+            if (data != null) {
+                if (mSecondConnectionData != null) {
+                    disconnectFromServer(mSecondConnectionData.id, info, mSecondConnectionData.address, mSecondConnectionData.port);
+                }
+                connectToServer(serverId, info, data);
+                mSecondConnectionData = data;
+            }
+        }
+    }
+
+    private void connectToServer(String serverId, ParcelableClientInfo info, ConnectionData data) {
+        ParcelableServerInfo infoForChange = getServerInfoById(serverId);
+        if (infoForChange != null) {
+            infoForChange.isLocked = true;
+            infoForChange.isConnected = true;
+            if (mOnServerListChange != null)
+                mOnServerListChange.onServerListChange(mServersInfo);
+        }
+        HashMap<String, String> params = getBaseParams(info.id);
+        params.put(NAME, info.name);
+        params.put(LAST_NAME, info.lastName);
+        params.put(GROUP, info.group);
+        params.put(BLOCK_BY, info.blockedBy);
+        try {
+            mSender.sendMessage(createMessage(CONNECT, params), data.address, data.port);
+        } catch (JSONException e) {
+            Log.e(TAG, "error with create json with connect message " + e.getMessage());
         }
     }
 
@@ -308,11 +320,12 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
             HashMap<String, String> params = parseParams(message);
             String id = params.get(ID);
             String port = params.get(PORT);
+            String fromId = params.get(FROM);
 
-            ParcelableServerInfo info = getServerInfoById(id);
-            disconnectFromServer(info.id, mClientInfo, address, port);
+            ConnectionData data = getServerDataById(fromId);
+            disconnectFromServer(data.id, mClientInfo, data.address, data.port);
 
-            ParcelableServerInfo infoForChange = getServerInfoById(id);
+            ParcelableServerInfo infoForChange = getServerInfoById(fromId);
             if (infoForChange != null) {
                 infoForChange.isLocked = false;
                 infoForChange.isConnected = false;
@@ -328,6 +341,12 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
 
     private void disconnectFromServer(String id, ParcelableClientInfo info, InetAddress address, String port) {
         HashMap<String, String> params = getBaseParams(info.id);
+        ConnectionData data = getServerDataById(id);
+        if (data != null && mFirstConnectionData != null && mFirstConnectionData.id.equals(data.id)
+                && mSecondConnectionData != null) {
+            mFirstConnectionData = mSecondConnectionData;
+            mSecondConnectionData = null;
+        }
         try {
             mSender.sendMessage(createMessage(DISCONNECT, params), address, port);
 //            ParcelableServerInfo infoForChange = getServerInfoById(id);
@@ -361,7 +380,7 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         thread.start();
     }
 
-    private ParcelableServerInfo getServerInfoById(String id) {
+    public ParcelableServerInfo getServerInfoById(String id) {
         for (ParcelableServerInfo info : mServersInfo) {
             if (info.id.equals(id)) {
                 return info;

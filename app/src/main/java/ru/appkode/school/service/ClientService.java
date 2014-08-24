@@ -80,8 +80,8 @@ public class ClientService extends Service implements  ClientConnection.OnServer
     private ParcelableClientInfo mClientInfo;
 
     private ArrayList<String> mWhiteList;
-
     private ArrayList<String> mBlackList;
+
     private boolean mIsFirstLaunch = true;
 
     private ClientSharedPreferences mClientSharedPreferences;
@@ -98,13 +98,13 @@ public class ClientService extends Service implements  ClientConnection.OnServer
 
         lockWifi();
 
-       // this.startForeground();
+       this.startForeground();
 
         mClientInfo = new ParcelableClientInfo();
         mClientSharedPreferences = new ClientSharedPreferences(this);
 
         mBlockHelper = new BlockHelper(this);
-        mFavouriteHelper = new FavouriteHelper();
+       // mFavouriteHelper = new FavouriteHelper();
 
         mClientConnection = new ClientConnection();
         mClientConnection.setOnServerListChangeListener(this);
@@ -113,9 +113,9 @@ public class ClientService extends Service implements  ClientConnection.OnServer
         startCheckBlockTime();
     }
 
-//    private void startForeground() {
-//        startForeground(NOTIF_ID, getNotification());
-//    }
+    private void startForeground() {
+        startForeground(NOTIF_ID, getNotification());
+    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -296,11 +296,28 @@ public class ClientService extends Service implements  ClientConnection.OnServer
             case ClientConnection.SERVER_BLOCK:
                 mClientInfo.isBlocked = true;
                 mClientInfo.blockedBy = id;
+                updateNotification();
+
+                mClientSharedPreferences.writeSharedPreferences(mClientInfo);
+
+                mWhiteList = mClientConnection.getWhiteList();
+                mBlackList =  mClientConnection.getBlackList();
+                mBlockHelper.setWhiteList(mWhiteList);
+                mBlockHelper.setBlackList(mBlackList);
+                mBlockHelper.block();
+
+                saveBlockTime(id);
                 actionStatus();
                 break;
             case ClientConnection.SERVER_UNBLOCK:
                 mClientInfo.isBlocked = false;
                 mClientInfo.blockedBy = "none";
+                updateNotification();
+
+                mClientSharedPreferences.writeSharedPreferences(mClientInfo);
+                mBlockHelper.unBlock();
+
+                clearBlockTime();
                 actionStatus();
                 break;
         }
@@ -344,7 +361,7 @@ public class ClientService extends Service implements  ClientConnection.OnServer
 //                break;
 //        }
 //    }
-
+//
 //    private void block(String serverId, ArrayList<String>[] lists) {
 //        ParcelableServerInfo info;
 //        mClientConnection.checkConnectionsOnBlock(serverId, mClientInfo);
@@ -388,19 +405,19 @@ public class ClientService extends Service implements  ClientConnection.OnServer
 //            info.isLocked = false;
 //        }
 //    }
-//
-//    private void saveBlockTime(String serverId) {
-//        SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
-//        editor.putLong(BLOCK_TIME, System.currentTimeMillis());
-//        editor.putString(BLOCK_BY_IN_TIME, serverId);
-//        editor.commit();
-//    }
-//
-//    private void clearBlockTime() {
-//        SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
-//        editor.putLong(BLOCK_TIME, -1);
-//        editor.commit();
-//    }
+
+    private void saveBlockTime(String serverId) {
+        SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
+        editor.putLong(BLOCK_TIME, System.currentTimeMillis());
+        editor.putString(BLOCK_BY_IN_TIME, serverId);
+        editor.commit();
+    }
+
+    private void clearBlockTime() {
+        SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
+        editor.putLong(BLOCK_TIME, -1);
+        editor.commit();
+    }
 
 //    private ParcelableServerInfo getServerInfoById(String serverId) {
 //        for (ParcelableServerInfo info : mServersInfo) {
@@ -412,38 +429,38 @@ public class ClientService extends Service implements  ClientConnection.OnServer
 //    }
 
 
-//    private void updateNotification() {
-//        Notification notification = getNotification();
-//
-//        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-//        mNotificationManager.notify(NOTIF_ID, notification);
-//    }
-//
-//    private Notification getNotification() {
-//        CharSequence title = getText(R.string.app_name);
-//        String message;
-//        String[] status = getResources().getStringArray(R.array.status);
-//        int imageRes;
-//        if (mClientInfo != null && mClientInfo.isBlocked) {
-//            ParcelableServerInfo info = getServerInfoById(mClientInfo.blockedBy);
-//            message = status[1] + " " + info.name + " " + info.secondName;
-//            imageRes = R.drawable.lock_small;
-//        } else  {
-//            message = status[0];
-//            imageRes = R.drawable.unlock_small;
-//        }
-//        PendingIntent contentIntent = PendingIntent.getActivity(this,
-//                0, new Intent(this, StudentActivity.class), 0);
-//
-//        return new Notification.Builder(this)
-//                .setContentTitle(title)
-//                .setContentText(message)
-//                .setSmallIcon(imageRes)
-//                .setWhen(System.currentTimeMillis())
-//                .setContentIntent(contentIntent)
-//                .setTicker(message)
-//                .build();
-//    }
+    private void updateNotification() {
+        Notification notification = getNotification();
+
+        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationManager.notify(NOTIF_ID, notification);
+    }
+
+    private Notification getNotification() {
+        CharSequence title = getText(R.string.app_name);
+        String message;
+        String[] status = getResources().getStringArray(R.array.status);
+        int imageRes;
+        if (mClientInfo != null && mClientInfo.isBlocked) {
+            ParcelableServerInfo info = mClientConnection.getServerInfoById(mClientInfo.blockedBy);
+            message = status[1] + " " + info.name + " " + info.secondName;
+            imageRes = R.drawable.lock_small;
+        } else  {
+            message = status[0];
+            imageRes = R.drawable.unlock_small;
+        }
+        PendingIntent contentIntent = PendingIntent.getActivity(this,
+                0, new Intent(this, StudentActivity.class), 0);
+
+        return new Notification.Builder(this)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setSmallIcon(imageRes)
+                .setWhen(System.currentTimeMillis())
+                .setContentIntent(contentIntent)
+                .setTicker(message)
+                .build();
+    }
 
     private void lockWifi() {
         WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
@@ -466,7 +483,7 @@ public class ClientService extends Service implements  ClientConnection.OnServer
                     long currentTime = System.currentTimeMillis();
                     Log.d("BLOCKTIME", "diff = " + (currentTime - blockTime));
                     if (currentTime - blockTime > MAX_TIME && !blockId.equals("none")) {
-//                        unblock(blockId);
+                    //   unblock(blockId);
                     }
                 }
             }

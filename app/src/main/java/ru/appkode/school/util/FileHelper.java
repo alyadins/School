@@ -27,7 +27,7 @@ public abstract class FileHelper {
 
     protected boolean isExternalStorageAvailable() {
         String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state)) {
+        if (state.equals(Environment.MEDIA_MOUNTED)) {
             return true;
         }
         return false;

@@ -9,6 +9,8 @@ import android.util.Log;
  */
 public class NsdRegistration implements NsdManager.RegistrationListener {
 
+    public static final String TAG = "NsdRegistration";
+
     public static final String SERVICE_TYPE = "_http._tcp.";
 
     private NsdManager mManager;
@@ -74,25 +76,25 @@ public class NsdRegistration implements NsdManager.RegistrationListener {
 
     @Override
     public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        Log.d("NSD", "registration fail " + serviceInfo.getServiceName());
+        Log.d(TAG, "registration fail " + serviceInfo.getServiceName());
         mIsRegistered = false;
     }
 
     @Override
     public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        Log.d("NSD", "unregistration fail " + serviceInfo.getServiceName());
+        Log.d(TAG, "unregistration fail " + serviceInfo.getServiceName());
         mIsRegistered = false;
     }
 
     @Override
     public void onServiceRegistered(NsdServiceInfo serviceInfo) {
-        Log.d("NSD", "registered " + serviceInfo.getServiceName());
+        Log.d(TAG, "registered " + serviceInfo.getServiceName());
         mIsRegistered = true;
     }
 
     @Override
     public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
-        Log.d("NSD", "unregistered " + serviceInfo.getServiceName());
+        Log.d(TAG, "unregistered " + serviceInfo.getServiceName());
         mIsRegistered = false;
         if (mIsNeedNewRegistration) {
             registerService();
