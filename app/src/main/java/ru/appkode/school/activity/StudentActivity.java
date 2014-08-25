@@ -32,14 +32,30 @@ import ru.appkode.school.service.ClientService;
 import ru.appkode.school.util.RegExpTestUtil;
 import ru.appkode.school.util.StringUtil;
 
-import static ru.appkode.school.service.ClientService.*;
-import static ru.appkode.school.service.ClientService.TAG;
+import static ru.appkode.school.service.ClientService.ACTION;
+import static ru.appkode.school.service.ClientService.BLOCK;
+import static ru.appkode.school.service.ClientService.BROADCAST_ACTION;
+import static ru.appkode.school.service.ClientService.CHANGE_NAME;
+import static ru.appkode.school.service.ClientService.CODE;
+import static ru.appkode.school.service.ClientService.CONNECT;
+import static ru.appkode.school.service.ClientService.DISCONNECT;
+import static ru.appkode.school.service.ClientService.FAVOURITE;
+import static ru.appkode.school.service.ClientService.GET_NAMES;
+import static ru.appkode.school.service.ClientService.IS_CONNECTED;
+import static ru.appkode.school.service.ClientService.IS_FREE;
+import static ru.appkode.school.service.ClientService.IS_INIT;
+import static ru.appkode.school.service.ClientService.MESSAGE;
+import static ru.appkode.school.service.ClientService.NAME;
+import static ru.appkode.school.service.ClientService.NAMES;
+import static ru.appkode.school.service.ClientService.START;
+import static ru.appkode.school.service.ClientService.STATUS;
+import static ru.appkode.school.service.ClientService.STOP;
+import static ru.appkode.school.service.ClientService.UNBLOCK;
+import static ru.appkode.school.service.ClientService.WHITE_LIST;
+import static ru.appkode.school.service.ClientService.WHITE_LIST_PARAM;
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 
-/**
- * Created by lexer on 01.08.14.
- */
 public class StudentActivity extends Activity implements ServerListFragment.OnServerAction, StudentInfoFragment.OnShowApps {
 
 
@@ -138,6 +154,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                 sendSimpleCommandToService(GET_NAMES);
                 break;
             case R.id.about:
+                sendSimpleCommandToService(STOP);
                 break;
             case R.id.change_username:
                 sendSimpleCommandToService(CHANGE_NAME);
@@ -224,6 +241,9 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
         mClientInfo.isBlocked = block;
         mClientInfo.blockedBy = blockBy;
 
+        mWaitDialog = new ProgressDialog(this);
+        mWaitDialog.setMessage(getString(R.string.wait));
+        mWaitDialog.show();
         sendCommandToService(IS_FREE, mClientInfo);
     }
 
@@ -249,6 +269,7 @@ public class StudentActivity extends Activity implements ServerListFragment.OnSe
                         } else {
                             Toast.makeText(StudentActivity.this, "Занято", Toast.LENGTH_LONG).show();
                         }
+                        mWaitDialog.dismiss();
                         break;
                     case CONNECT:
                         break;

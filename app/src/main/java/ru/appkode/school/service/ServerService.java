@@ -5,7 +5,6 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.net.nsd.NsdManager;
 import android.net.wifi.WifiManager;
 import android.os.IBinder;
 import android.util.Log;
@@ -17,15 +16,12 @@ import ru.appkode.school.R;
 import ru.appkode.school.activity.TeacherActivity;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
-import ru.appkode.school.network.NsdName;
-import ru.appkode.school.network.NsdRegistration;
+import ru.appkode.school.network.JmDNSHelper;
+import ru.appkode.school.network.JmDNSNameChecker;
 import ru.appkode.school.network.ServerConnection;
 import ru.appkode.school.util.AppListHelper;
 import ru.appkode.school.util.ServerSharedPreferences;
 
-/**
- * Created by lexer on 10.08.14.
- */
 public class ServerService extends Service implements ServerConnection.OnClientListChanged {
 
     private static final String TAG = "ServerService";
@@ -59,9 +55,8 @@ public class ServerService extends Service implements ServerConnection.OnClientL
 
     public static final String BROADCAST_ACTION = "ru.appkode.school.serverbroadcast";
 
-    private NsdManager mManager;
-    private NsdRegistration mNsdRegistration;
-    private NsdName mNsdName;
+
+    private JmDNSHelper mJmDNSHelper;
 
     private ServerConnection mServerConnection;
     private ParcelableServerInfo mServerInfo;
@@ -76,12 +71,6 @@ public class ServerService extends Service implements ServerConnection.OnClientL
     @Override
     public void onCreate() {
         super.onCreate();
-
-        mManager = (NsdManager) getSystemService(NSD_SERVICE);
-
-        mNsdRegistration = new NsdRegistration(mManager);
-        mNsdName = new NsdName(mManager, NsdName.SERVER);
-        mNsdName.start();
 
         mServerConnection = new ServerConnection();
         mServerConnection.setOnClientListChangedListener(this);
@@ -176,22 +165,13 @@ public class ServerService extends Service implements ServerConnection.OnClientL
 
     //Actions methods
     private void actionStart(ParcelableServerInfo info) {
-        mServerInfo = info;
-        if (!mNsdRegistration.isRegistered()) {
-            startService(info);
-        } else {
-            mNsdRegistration.stop();
-            while (mNsdRegistration.isRegistered()) {}
-            startService(info);
-        }
+        startService(info);
     }
 
     private void startService(ParcelableServerInfo info) {
         mSharedPreferences.writeSharedPreferences(info);
 
-        mNsdRegistration.setName(info.id);
-        mNsdRegistration.setPort(Integer.parseInt(mServerConnection.getPort()));
-        mNsdRegistration.start();
+        mJmDNSHelper = new JmDNSHelper(this, info.id, mServerConnection.getPort());
 
         mServerConnection.setServerInfo(info);
 
@@ -199,15 +179,20 @@ public class ServerService extends Service implements ServerConnection.OnClientL
     }
 
     private void actionIsNameFree(final ParcelableServerInfo info) {
-        boolean isNameFree = mNsdName.isNameFree(info.id, mServerInfo.id);
-        Intent intent = new Intent(BROADCAST_ACTION);
-        intent.putExtra(CODE, IS_NAME_FREE);
-        intent.putExtra(MESSAGE, isNameFree);
-        sendBroadcast(intent);
+        JmDNSNameChecker checker = new JmDNSNameChecker();
+        checker.isNameFree(info.id, new JmDNSNameChecker.OnNameCheckListener() {
+            @Override
+            public void onNameCheck(boolean isFree) {
+                Intent intent = new Intent(BROADCAST_ACTION);
+                intent.putExtra(CODE, IS_NAME_FREE);
+                intent.putExtra(MESSAGE, isFree);
+                sendBroadcast(intent);
+            }
+        });
     }
 
     private void actionStop() {
-        mNsdRegistration.stop();
+        mJmDNSHelper.stop();
         sendSimpleBroadCast(STOP, "stop");
     }
 
@@ -257,7 +242,7 @@ public class ServerService extends Service implements ServerConnection.OnClientL
         } else {
             intent.putExtra(IS_INIT, false);
         }
-
+        mJmDNSHelper.stop();
         sendBroadcast(intent);
     }
 
@@ -317,8 +302,7 @@ public class ServerService extends Service implements ServerConnection.OnClientL
     @Override
     public void onDestroy() {
         Log.d("TEST", "on destroy");
-        mNsdName.stop();
-        mNsdRegistration.stop();
+        mJmDNSHelper.stop();
         super.onDestroy();
     }
 }

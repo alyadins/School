@@ -80,5 +80,5 @@
     <string name="error">Предупреждение</string>
     <string name="clients_connected">Нельзя изменить имя при подключенных клиентах</string>
     <string name="connected_to_server">Нельзя изменить имя при подключении к серверу</string>
-
+    <string name="wait">Пожалуйста подождите</string>
 </resources>

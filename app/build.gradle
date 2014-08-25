@@ -21,5 +21,5 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile files('libs/jmdns.jar')
+    compile files('libs/jmdns-3.4.1.jar')
 }

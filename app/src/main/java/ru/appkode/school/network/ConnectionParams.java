@@ -1,8 +1,5 @@
 package ru.appkode.school.network;
 
-/**
- * Created by lexer on 20.08.14.
- */
 public interface ConnectionParams {
 
     public static final String METHOD = "method";
@@ -28,7 +25,6 @@ public interface ConnectionParams {
     public static final String SUBJECT = "subject";
     public static final String GROUP = "group";
     public static final String BLOCK_BY = "block_by";
-    public static final String ADDRESS = "address";
     public static final String PORT = "port";
     public static final String WHITE_LIST = "white_list";
     public static final String BLACK_LIST = "black_list";

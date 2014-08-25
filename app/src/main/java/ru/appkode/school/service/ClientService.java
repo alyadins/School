@@ -8,16 +8,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
-import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
-import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import javax.jmdns.ServiceInfo;
 
 import ru.appkode.school.Infos;
 import ru.appkode.school.R;
@@ -25,16 +24,12 @@ import ru.appkode.school.activity.StudentActivity;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
 import ru.appkode.school.network.ClientConnection;
-import ru.appkode.school.network.NsdName;
-import ru.appkode.school.network.NsdRegistration;
-import ru.appkode.school.network.ServerConnection;
+import ru.appkode.school.network.JmDNSHelper;
+import ru.appkode.school.network.JmDNSNameChecker;
 import ru.appkode.school.util.BlockHelper;
 import ru.appkode.school.util.ClientSharedPreferences;
 import ru.appkode.school.util.FavouriteHelper;
 
-/**
- * Created by lexer on 10.08.14.
- */
 public class ClientService extends Service implements  ClientConnection.OnServerListChange, ClientConnection.OnServerAction {
     public static final String TAG = "ClientService";
     public static final int NOTIF_ID = 1;
@@ -68,13 +63,6 @@ public class ClientService extends Service implements  ClientConnection.OnServer
     public static final String IS_CONNECTED = "is_connected";
     public static final String WHITE_LIST_PARAM = "white_list";
 
-    private NsdManager mManager;
-
-
-
-    private NsdRegistration mNsdRegistration;
-
-    private NsdName mNsdName;
     private ClientConnection mClientConnection;
 
     private ParcelableClientInfo mClientInfo;
@@ -85,16 +73,13 @@ public class ClientService extends Service implements  ClientConnection.OnServer
     private boolean mIsFirstLaunch = true;
 
     private ClientSharedPreferences mClientSharedPreferences;
+    private JmDNSHelper mJmDNSHelper;
     private BlockHelper mBlockHelper;
 
     private FavouriteHelper mFavouriteHelper;
     @Override
     public void onCreate() {
         super.onCreate();
-        mManager = (NsdManager) getSystemService(NSD_SERVICE);
-        mNsdRegistration = new NsdRegistration(mManager);
-        mNsdName = new NsdName(mManager, NsdName.CLIENT);
-        mNsdName.start();
 
         lockWifi();
 
@@ -177,39 +162,34 @@ public class ClientService extends Service implements  ClientConnection.OnServer
     }
 
     private void actionStart(ParcelableClientInfo clientInfo) {
-        if (!mNsdRegistration.isRegistered()) {
-            startService(clientInfo);
-        } else {
-            mNsdRegistration.stop();
-            while (mNsdRegistration.isRegistered()) {}
-            startService(clientInfo);
-        }
+        startService(clientInfo);
     }
 
     private void startService(ParcelableClientInfo clientInfo) {
         mClientInfo = clientInfo;
         mClientSharedPreferences.writeSharedPreferences(mClientInfo);
 
-        mNsdRegistration.setName(mClientInfo.id);
-        mNsdRegistration.setPort(Integer.parseInt(mClientConnection.getPort()));
-        mNsdRegistration.start();
-
+        mJmDNSHelper = new JmDNSHelper(this, clientInfo.id, mClientConnection.getPort());
         mClientConnection.setClientInfo(mClientInfo);
 
         sendSimpleBroadcast(START, "started");
     }
 
     private void actionStop() {
-        mNsdRegistration.stop();
-        mNsdName.stop();
+        mJmDNSHelper.stop();
     }
 
     private void actionIsFree(final ParcelableClientInfo clientInfo) {
-        boolean isNameFree = mNsdName.isNameFree(clientInfo.id, mClientInfo.id);
-        Intent intent = new Intent(BROADCAST_ACTION);
-        intent.putExtra(CODE, IS_FREE);
-        intent.putExtra(MESSAGE, isNameFree);
-        sendBroadcast(intent);
+        JmDNSNameChecker checker = new JmDNSNameChecker();
+        checker.isNameFree(clientInfo.id, new JmDNSNameChecker.OnNameCheckListener() {
+            @Override
+            public void onNameCheck(boolean isFree) {
+                Intent intent = new Intent(BROADCAST_ACTION);
+                intent.putExtra(CODE, IS_FREE);
+                intent.putExtra(MESSAGE, isFree);
+                sendBroadcast(intent);
+            }
+        });
     }
 
     private void actionConnect(ParcelableServerInfo serverInfo) {
@@ -236,10 +216,12 @@ public class ClientService extends Service implements  ClientConnection.OnServer
     }
 
     private void actionGetNames() {
-        List<NsdServiceInfo> resolvedServers = mNsdName.getResolvedServices();
-
-        for (NsdServiceInfo info : resolvedServers)
-            mClientConnection.addServer(info, mClientInfo);
+        mJmDNSHelper.findServers(new JmDNSHelper.OnServicesFound() {
+            @Override
+            public void onServicesFound(ArrayList<ServiceInfo> infos) {
+                mClientConnection.setServers(infos, mClientInfo);
+            }
+        });
     }
 
     private void actionStatus() {
@@ -335,77 +317,6 @@ public class ClientService extends Service implements  ClientConnection.OnServer
         return null;
     }
 
-
-//    @Override
-//    public void OnStatusChanged(final int status, final String serverId, boolean isNeedStatusRefresh, ArrayList<String>[] lists) {
-//        ParcelableServerInfo info;
-//        switch (status) {
-//            case ServerConnection.BLOCK_CODE:
-//                block(serverId, lists);
-//                break;
-//            case ServerConnection.UNBLOCK_CODE:
-//                unblock(serverId);
-//                break;
-//            case ServerConnection.CONNECTED:
-//                info = getServerInfoById(serverId);
-//                info.isConnected = true;
-//                if (isNeedStatusRefresh)
-//                    actionStatus();
-//                break;
-//            case ServerConnection.DISCONNECT_FROM:
-//                info = getServerInfoById(serverId);
-//                info.isConnected = false;
-//                info.isLocked = false;
-//                if (isNeedStatusRefresh)
-//                    actionStatus();
-//                break;
-//        }
-//    }
-//
-//    private void block(String serverId, ArrayList<String>[] lists) {
-//        ParcelableServerInfo info;
-//        mClientConnection.checkConnectionsOnBlock(serverId, mClientInfo);
-//        mClientInfo.isBlocked = true;
-//        mClientInfo.blockedBy = serverId;
-//        info = getServerInfoById(serverId);
-//        info.isLocked = true;
-//        updateNotification();
-//        mClientSharedPreferences.writeSharedPreferences(mClientInfo);
-//
-//        mWhiteList = lists[0];
-//        mBlackList =  lists[1];
-//        mBlockHelper.setWhiteList(mWhiteList);
-//        mBlockHelper.setBlackList(mBlackList);
-//        mBlockHelper.block();
-//
-//        saveBlockTime(serverId);
-//
-//        actionStatus();
-//
-//    }
-
-//    private void unblock(String serverId) {
-//        mClientInfo.blockedBy = "none";
-//        mClientInfo.isBlocked = false;
-//
-//        mClientConnection.checkConnectionForUnblock(serverId, mClientInfo);
-//        unblockAllServers();
-//        updateNotification();
-//        mClientSharedPreferences.writeSharedPreferences(mClientInfo);
-//        mBlockHelper.unBlock();
-//
-//        clearBlockTime();
-//
-//        actionStatus();
-//
-//    }
-//
-//    private void unblockAllServers() {
-//        for (ParcelableServerInfo info : mServersInfo) {
-//            info.isLocked = false;
-//        }
-//    }
-
     private void saveBlockTime(String serverId) {
         SharedPreferences.Editor editor = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE).edit();
         editor.putLong(BLOCK_TIME, System.currentTimeMillis());
@@ -419,14 +330,6 @@ public class ClientService extends Service implements  ClientConnection.OnServer
         editor.commit();
     }
 
-//    private ParcelableServerInfo getServerInfoById(String serverId) {
-//        for (ParcelableServerInfo info : mServersInfo) {
-//            if (info.id.equals(serverId))
-//                return info;
-//        }
-//
-//        return null;
-//    }
 
 
     private void updateNotification() {
@@ -494,8 +397,7 @@ public class ClientService extends Service implements  ClientConnection.OnServer
     @Override
     public void onDestroy() {
         Log.d("TEST", "onDestroy");
-        mNsdRegistration.stop();
-        mNsdName.stop();
+        mJmDNSHelper.stop();
         super.onDestroy();
     }
 }

@@ -1,6 +1,5 @@
 package ru.appkode.school.network;
 
-import android.net.nsd.NsdServiceInfo;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -11,6 +10,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.jmdns.ServiceInfo;
+
 import ru.appkode.school.data.ConnectionData;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
@@ -18,19 +19,12 @@ import ru.appkode.school.data.ParcelableServerInfo;
 import static ru.appkode.school.util.JSONHelper.*;
 
 
-/**
- * Created by lexer on 04.08.14.
- */
 public class ClientConnection implements MessageReceiver.OnMessageReceive, ConnectionParams {
 
     private static final String TAG = "ClientConnection";
 
     public static final int SERVER_BLOCK = 0;
     public static final int SERVER_UNBLOCK = 1;
-
-    public interface OnStatusChanged {
-        public void OnStatusChanged(int status, String serverId, boolean isNeedStatusRefresh, ArrayList<String>[] lists);
-    }
 
     public interface OnServerListChange {
         public void onServerListChange(ArrayList<ParcelableServerInfo> serversInfo);
@@ -63,7 +57,7 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
 
         mSender = new MessageSender();
         mReceiver = new MessageReceiver();
-        while (!mReceiver.isInit()){};
+        while (!mReceiver.isInit()){}
         mReceiver.setOnMessageReceiveListener(this);
 
         mWhiteList = new ArrayList<String>();
@@ -124,21 +118,35 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         }
     }
 
-    public void addServer(NsdServiceInfo nsdServiceInfo, ParcelableClientInfo info) {
-        ParcelableServerInfo serverInfo = getServerInfoById(nsdServiceInfo.getServiceName());
-        if (serverInfo != null) {
-            checkServerAvailable(serverInfo, nsdServiceInfo.getHost());
-            return;
+    public void setServers(ArrayList<ServiceInfo> infos, ParcelableClientInfo clientInfo) {
+        deleteServers(infos);
+        for (ServiceInfo info : infos) {
+            String message;
+            try {
+                message = createMessage(INFO, getBaseParams(clientInfo.id));
+            } catch (JSONException e) {
+                Log.e(TAG, "error with creating info json " + e.getMessage());
+                return;
+            }
+
+            mSender.sendMessage(message, info.getAddress(), info.getPort());
         }
-        String message;
-        try {
-            message = createMessage(INFO, getBaseParams(info.id));
-        } catch (JSONException e) {
-            Log.e(TAG, "error with creating info json " + e.getMessage());
-            return;
+    }
+
+    private void deleteServers(ArrayList<ServiceInfo> infos) {
+        ArrayList<ParcelableServerInfo> availableServers = new ArrayList<ParcelableServerInfo>();
+        for (ServiceInfo info : infos) {
+            ParcelableServerInfo serverInfo = getServerInfoById(info.getName());
+            if (serverInfo != null) {
+                availableServers.add(serverInfo);
+            }
         }
 
-        mSender.sendMessage(message, nsdServiceInfo.getHost(), nsdServiceInfo.getPort());
+        mServersInfo.clear();
+        mServersInfo.addAll(availableServers);
+        if (mOnServerListChange != null) {
+            mOnServerListChange.onServerListChange(mServersInfo);
+        }
     }
 
     public ArrayList<String> getWhiteList() {
@@ -166,10 +174,7 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
     }
 
     public boolean isConnected() {
-        if (mFirstConnectionData != null || mSecondConnectionData != null)
-            return true;
-        else
-            return false;
+        return mFirstConnectionData != null || mSecondConnectionData != null;
     }
 
     @Override
@@ -178,24 +183,24 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         try {
             String method = parseMethod(message);
             if (method.equals(CONNECT_CALLBACK)) {
-                methodConnectCallback(message, address);
+                methodConnectCallback(message);
             } else if (method.equals(DISCONNECT_CALLBACK)) {
-                methodDisconnectCallback(message, address);
+                methodDisconnectCallback(message);
             } else if (method.equals(INFO_CALLBACK)) {
                 methodInfo(message, address);
             } else if (method.equals(BLOCK)) {
-                methodBlock(message, address);
+                methodBlock(message);
             } else if (method.equals(UNBLOCK)) {
-                methodUnblock(message, address);
+                methodUnblock(message);
             } else if (method.equals(DISCONNECT_FROM)) {
-                methodDisconnectFrom(message, address);
+                methodDisconnectFrom(message);
             }
         } catch (JSONException e) {
             e.printStackTrace();
         }
     }
 
-    private void methodConnectCallback(String message, InetAddress address) {
+    private void methodConnectCallback(String message) {
         try {
             HashMap<String, String> params = parseParams(message);
             String id = params.get(ID);
@@ -212,7 +217,7 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         }
     }
 
-    private void methodDisconnectCallback(String message, InetAddress address) {
+    private void methodDisconnectCallback(String message) {
         try {
             HashMap<String, String> params = parseParams(message);
             String id = params.get(ID);
@@ -248,12 +253,27 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
             String subject = params.get(SUBJECT);
             String port = params.get(PORT);
 
-            ParcelableServerInfo info = new ParcelableServerInfo(lastName, name, secondName, subject, id);
-            ConnectionData data = new ConnectionData(id, address, port);
-            mServersInfo.add(info);
-            mServersData.add(data);
+            ParcelableServerInfo info = getServerInfoById(id);
 
-            Log.d(TAG, info.toString());
+            if (info == null) {
+                info = new ParcelableServerInfo(lastName, name, secondName, subject, id);
+                mServersInfo.add(info);
+            } else {
+                info.name = name;
+                info.secondName = secondName;
+                info.subject = subject;
+                info.lastName = lastName;
+            }
+
+            ConnectionData data = getServerDataById(id);
+            if (data == null) {
+                data = new ConnectionData(id, address, port);
+                mServersData.add(data);
+            } else {
+                data.address = address;
+                data.port = port;
+            }
+
             if (mOnServerListChange != null) {
                 mOnServerListChange.onServerListChange(mServersInfo);
             }
@@ -263,11 +283,10 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
     }
 
 
-    private void methodBlock(String message, InetAddress address) {
+    private void methodBlock(String message) {
         try {
             HashMap<String, String> params = parseBlockJson(message, mWhiteList, mBlackList);
             String id = params.get(ID);
-            String port = params.get(PORT);
 
             ParcelableServerInfo infoForChange = getServerInfoById(id);
             if (infoForChange != null) {
@@ -288,11 +307,10 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
     }
 
 
-    private void methodUnblock(String message, InetAddress address) {
+    private void methodUnblock(String message) {
         try {
             HashMap<String, String> params = parseParams(message);
             String id = params.get(ID);
-            String port = params.get(PORT);
 
             ParcelableServerInfo infoForChange = getServerInfoById(id);
             if (infoForChange != null) {
@@ -312,14 +330,12 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         }
     }
 
-    private void methodDisconnectFrom(String message, InetAddress address) {
+    private void methodDisconnectFrom(String message) {
         if (mClientInfo == null) {
             throw new NullPointerException("set client info");
         }
         try {
             HashMap<String, String> params = parseParams(message);
-            String id = params.get(ID);
-            String port = params.get(PORT);
             String fromId = params.get(FROM);
 
             ConnectionData data = getServerDataById(fromId);
@@ -349,35 +365,9 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         }
         try {
             mSender.sendMessage(createMessage(DISCONNECT, params), address, port);
-//            ParcelableServerInfo infoForChange = getServerInfoById(id);
-//            if (infoForChange != null) {
-//                infoForChange.isLocked = true;
-//                if (mOnServerListChange != null) {
-//                    mOnServerListChange.onServerListChange(mServersInfo);
-//                }
-//            }
         } catch (JSONException e) {
             Log.e(TAG, "error with create json with disconnect message" + e.getMessage());
         }
-    }
-
-    private void checkServerAvailable(final ParcelableServerInfo info, final InetAddress address) {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if (!address.isReachable(3000)) {
-                        mServersInfo.remove(info);
-                        if (mOnServerListChange != null) {
-                            mOnServerListChange.onServerListChange(mServersInfo);
-                        }
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        thread.start();
     }
 
     public ParcelableServerInfo getServerInfoById(String id) {
@@ -409,238 +399,5 @@ public class ClientConnection implements MessageReceiver.OnMessageReceive, Conne
         return params;
     }
 
-//    public void connect(ParcelableServerInfo serverInfo, ParcelableClientInfo clientInfo) {
-//        if (clientInfo == null) {
-//            throw new IllegalArgumentException("client info is null, init it");
-//        }
-//
-//        connectToServer(serverInfo, clientInfo);
-//    }
-//
-//
-//    public void disconnect(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
-//        Log.d("TEST", "disconnect from " + info.name + " " + info.lastName);
-//        disconnectFromServer(info, clientInfo);
-//    }
-//
-//    public void askForServersInfo(List<NsdServiceInfo> infos) {
-//        for (NsdServiceInfo info : infos) {
-//            askForServerInfo(info);
-//        }
-//    }
-//
-//    public ArrayList<ParcelableServerInfo> getServersInfo() {
-//        return mServersInfo;
-//    }
-//
-//    public void askForServerInfo(final NsdServiceInfo serviceInfo) {
-//        try {
-//            ParcelableServerInfo serverInfo = getServerDataById(serviceInfo.getServiceName());
-//            if (serverInfo != null && mOnServerInfoDownload != null && !mIsNamesSend) {
-//                mOnServerInfoDownload.OnServerInfoDownload(serverInfo);
-//                return;
-//            }
-//            Log.d("TEST", "ask info from " + serviceInfo.getHost() + " " + serviceInfo.getPort());
-//            Connection connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
-//            connection.setOnMessageReceivedListener(new Connection.OnMessageReceivedListener() {
-//                @Override
-//                public void onReceiveMessage(Connection connection, String message) {
-//                    try {
-//                        if (parseCode(message) == Server.INFO_CODE) {
-//                            ParcelableServerInfo serverInfo = parseServerInfo(message);
-//                            mServersData.add(new ServerConnectionData(serverInfo.id, serviceInfo));
-//                            mServersInfo.add(serverInfo);
-//                            if (mOnServerInfoDownload != null && !mIsNamesSend) {
-//                                mOnServerInfoDownload.OnServerInfoDownload(serverInfo);
-//                            }
-//                            connection.sendMessage("END");
-//                        } else {
-//                            Log.e(TAG, "server error");
-//                        }
-//                    } catch (JSONException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            });
-//            connection.start();
-//            connection.sendMessage(createInfoRequest());
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        } catch (JSONException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    public void updateServerList(ArrayList<ParcelableServerInfo> list) {
-//        mServersInfo = list;
-//    }
-//
-//    public void setSendNames(boolean isSended) {
-//        mIsNamesSend = isSended;
-//    }
-//
-//    public boolean isConnected() {
-//        return (mFirstConnectionData != null && mFirstConnectionData.connection != null && mFirstConnectionData.connection.isConnected()) ||
-//                (mSecondConnectionData != null && mSecondConnectionData.connection != null && mSecondConnectionData.connection.isConnected());
-//    }
-//
-////    public void removeServer(NsdServiceInfo serviceInfo) {
-//
-//    public void connectToServer(ParcelableServerInfo info, ParcelableClientInfo clientInfo) {
-//        NsdServiceInfo serviceInfo;
-//        ServerConnectionData dataForConnect = getServerInfoById(info.id);
-//        try {
-//            if (!clientInfo.isBlocked) {
-//                if (mFirstConnectionData != null && !mFirstConnectionData.id.equals(info.id)) {
-//                    sendDisconnect(mFirstConnectionData, clientInfo);
-//                }
-//                serviceInfo = dataForConnect.serviceInfo;
-//                dataForConnect.connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
-//                dataForConnect.connection.start();
-//                dataForConnect.connection.setOnMessageReceivedListener(this);
-//                dataForConnect.connection.sendMessage(createClientConnect(clientInfo));
-//                mFirstConnectionData = dataForConnect;
-//            } else {
-//                if (mSecondConnectionData != null) {
-//                    sendDisconnect(mSecondConnectionData, clientInfo);
-//                }
-//                serviceInfo = dataForConnect.serviceInfo;
-//                dataForConnect.connection = new Connection(serviceInfo.getHost(), serviceInfo.getPort());
-//                dataForConnect.connection.start();
-//                dataForConnect.connection.setOnMessageReceivedListener(this);
-//                dataForConnect.connection.sendMessage(createClientConnect(clientInfo));
-//                mSecondConnectionData = dataForConnect;
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    //        String id = serviceInfo.getServiceName();
-////        mServersData.remove(getServerInfoById(id));
-////        mServersInfo.remove(getServerDataById(id));
-////        if (mOnStatusChanged != null) {
-////            mOnStatusChanged.OnStatusChanged();
-////        }
-//    public void checkConnectionsOnBlock(String id, ParcelableClientInfo clientInfo) {
-//        if (mSecondConnectionData != null && mSecondConnectionData.id.equals(id)) {
-//            sendDisconnect(mFirstConnectionData, clientInfo);
-//            mFirstConnectionData = mSecondConnectionData;
-//            mSecondConnectionData = null;
-//        }
-//    }
-//
-//    public void checkConnectionForUnblock(String id, ParcelableClientInfo clientInfo) {
-//        if (mSecondConnectionData != null && mSecondConnectionData.id.equals(id)) {
-//            sendDisconnect(mFirstConnectionData, clientInfo);
-//            mFirstConnectionData = mSecondConnectionData;
-//            mSecondConnectionData = null;
-//        }
-//    }
-//
-//
-//    private ServerConnectionData getServerInfoById(String id) {
-//        for (ServerConnectionData data : mServersData) {
-//            if (data.id.equals(id)) {
-//                return data;
-//            }
-//        }
-//        return null;
-//    }
-//
-//    private ParcelableServerInfo getServerDataById(String id) {
-//        for (ParcelableServerInfo info : mServersInfo) {
-//            if (info.id.equals(id)) {
-//                return info;
-//            }
-//        }
-//
-//        return null;
-//    }
-//
-//    public void disconnectFromServer(ParcelableClientInfo clientInfo) {
-//        Log.d("TEST", "mFirstconndata null = " + (mFirstConnectionData == null));
-//        Log.d("TEST", "mSecondConnectionData null = " + (mSecondConnectionData == null));
-//        if (mFirstConnectionData != null) {
-//            sendDisconnect(mFirstConnectionData, clientInfo);
-//        }
-//        if (mSecondConnectionData != null) {
-//            sendDisconnect(mSecondConnectionData, clientInfo);
-//        }
-//    }
-//
-//    public void disconnectFromServer(ParcelableServerInfo info, ParcelableClientInfo clientInfo)  {
-//        ServerConnectionData data = getServerInfoById(info.id);
-//        if (data == mSecondConnectionData) {
-//            mSecondConnectionData = null;
-//        }
-//        sendDisconnect(data, clientInfo);
-//    }
-//
-//    private void sendDisconnect(ServerConnectionData data, ParcelableClientInfo clientInfo) {
-//        try {
-//            if (data != null && data.connection != null) {
-//                data.connection.sendMessage(createClientDisconnect(clientInfo));
-//                if (mOnStatusChanged != null) {
-//                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECT_FROM, data.id, false, null);
-//                }
-//            }
-//        } catch (JSONException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    @Override
-//    public void onReceiveMessage(Connection connection, String message) throws JSONException {
-//        int code =  JSONHelper.parseCode(message);
-//        Log.d("CLIENT_MESSAGE", message);
-//        //200
-//        if (mOnStatusChanged != null) {
-//            String id = JSONHelper.parseServerId(message);
-//            switch (code) {
-//                case Server.CONNECTED:
-//                    Log.d("CT", "connected to " + id);
-//                    mOnStatusChanged.OnStatusChanged(code, id, true, null);
-//                    break;
-//                case Server.DISCONNECT_FROM:
-//                    Log.d("CT", "disconnected from " + id);
-//                    getServerInfoById(id).connection.closeConnection();
-//                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECT_FROM, id, false, null);
-//                    break;
-//                case Server.DISCONNECT:
-//                    Log.d("TEST", "delete code");
-//                    getServerInfoById(id).connection.closeConnection();
-//                    mOnStatusChanged.OnStatusChanged(Server.DISCONNECT_FROM, id, true, null);
-//                    break;
-//                case Server.BLOCK_CODE:
-//                    ArrayList[] lists = new ArrayList[2];
-//                    lists[0] = JSONHelper.parseList(message, "white_list");
-//                    lists[1] = JSONHelper.parseList(message, "black_list");
-//                    mOnStatusChanged.OnStatusChanged(Server.BLOCK_CODE, id, true, lists);
-//                    break;
-//                case Server.UNBLOCK_CODE:
-//                    mOnStatusChanged.OnStatusChanged(code, id, true, null);
-//                     break;
-//            }
-//        }
-//        if (code / 100 == 4) {
-//            Log.e(TAG, "server error");
-//        }
-//    }
-//
-//    public void setOnStatusChangedListener(OnStatusChanged l) {
-//        mOnStatusChanged = l;
-//    }
-//
-//    public void setOnTeacherListChangedListener(OnTeacherListChanged l) {
-//        mOnTeacherListChanged = l;
-//    }
-//
-//    public void setOnServerInfoDownloadListener(OnServerInfoDownload l) {
-//        mOnServerInfoDownload = l;
-//    }
-//
-//    public interface OnServerInfoDownload {
-//        public void OnServerInfoDownload(ParcelableServerInfo info);
-//    }
+
 }

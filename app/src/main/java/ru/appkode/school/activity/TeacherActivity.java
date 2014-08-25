@@ -4,11 +4,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -20,7 +20,6 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 
-import ru.appkode.school.Infos;
 import ru.appkode.school.R;
 import ru.appkode.school.data.ParcelableClientInfo;
 import ru.appkode.school.data.ParcelableServerInfo;
@@ -34,14 +33,25 @@ import static ru.appkode.school.fragment.TeacherInfoFragment.DELETE;
 import static ru.appkode.school.fragment.TeacherInfoFragment.OnUserActionPerform;
 import static ru.appkode.school.fragment.TeacherInfoFragment.TAG;
 import static ru.appkode.school.fragment.TeacherInfoFragment.UNBLOCK;
-import static ru.appkode.school.service.ServerService.*;
+import static ru.appkode.school.service.ServerService.ACTION;
+import static ru.appkode.school.service.ServerService.BROADCAST_ACTION;
+import static ru.appkode.school.service.ServerService.CHANGE_NAME;
+import static ru.appkode.school.service.ServerService.CLIENTS_CONNECTED;
+import static ru.appkode.school.service.ServerService.CODE;
+import static ru.appkode.school.service.ServerService.GET_CLIENTS;
+import static ru.appkode.school.service.ServerService.IS_CLIENTS_CONNECTED;
+import static ru.appkode.school.service.ServerService.IS_INIT;
+import static ru.appkode.school.service.ServerService.IS_NAME_FREE;
+import static ru.appkode.school.service.ServerService.MESSAGE;
+import static ru.appkode.school.service.ServerService.NAME;
+import static ru.appkode.school.service.ServerService.NAMES;
+import static ru.appkode.school.service.ServerService.START;
+import static ru.appkode.school.service.ServerService.STATUS;
+import static ru.appkode.school.service.ServerService.STOP;
 import static ru.appkode.school.util.StringUtil.checkForEmpty;
 import static ru.appkode.school.util.StringUtil.getTextFromEditTextById;
 
 
-/**
- * Created by lexer on 01.08.14.
- */
 public class TeacherActivity extends Activity implements OnUserActionPerform{
 
     private ParcelableServerInfo mServerInfo;
@@ -51,6 +61,7 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
     private ClientListFragment mClientListFragment;
 
     private AlertDialog mDialog;
+    private ProgressDialog mWaitDialog;
 
     private BroadcastReceiver mBroadcastReceiver;
 
@@ -122,10 +133,9 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                 startService(intent);
                 break;
             case R.id.about:
-                SharedPreferences preferences = getSharedPreferences(Infos.PREFERENCES, MODE_PRIVATE);
-                SharedPreferences.Editor editor = preferences.edit();
-                editor.clear();
-                editor.commit();
+                intent = new Intent(TeacherActivity.this, ServerService.class);
+                intent.putExtra(ACTION, STOP);
+                startService(intent);
                 break;
         }
         return super.onOptionsItemSelected(item);
@@ -175,13 +185,17 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
 
         mServerInfo = new ParcelableServerInfo(lastName, name, secondName, subject);
 
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder buffer = new StringBuilder();
         buffer.append(mServerInfo.name)
                 .append(mServerInfo.secondName)
                 .append(mServerInfo.lastName)
                 .append(mServerInfo.subject);
 
         mServerInfo.id = "serv" + StringUtil.md5(buffer.toString().toLowerCase());
+
+        mWaitDialog = new ProgressDialog(TeacherActivity.this);
+        mWaitDialog.setMessage(getString(R.string.wait));
+        mWaitDialog.show();
 
         Intent nameIntent = new Intent(TeacherActivity.this, ServerService.class);
         nameIntent.putExtra(ACTION, IS_NAME_FREE);
@@ -201,7 +215,7 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
     public void onUserActionPerform(int action) {
         ArrayList<ParcelableClientInfo> selectedClients = new ArrayList<ParcelableClientInfo>();
         for (ParcelableClientInfo info : mClientListFragment.getClientsInfo()) {
-            if (info.isChosen == true) {
+            if (info.isChosen) {
                 selectedClients.add(info);
             }
         }
@@ -236,6 +250,7 @@ public class TeacherActivity extends Activity implements OnUserActionPerform{
                         } else {
                             Toast.makeText(TeacherActivity.this, "Занято", Toast.LENGTH_LONG).show();
                         }
+                        mWaitDialog.dismiss();
                         break;
                     case GET_CLIENTS:
                         ArrayList<ParcelableClientInfo> infos = intent.getParcelableArrayListExtra(NAMES);
